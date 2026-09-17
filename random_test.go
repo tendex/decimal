@@ -89,6 +89,25 @@ var rand64 = randFormat[Decimal64]{
 	sqrt: (*Context).Sqrt64,
 }
 
+var rand32 = randFormat[Decimal32]{
+	ref: ref32,
+	toRef: func(x Decimal32) refVal {
+		n := x.unpack()
+		return refVal{kind: n.kind, neg: n.neg, coef: new(big.Int).SetUint64(n.coef), exp: int(n.exp)}
+	},
+	fromRef: func(v refVal) Decimal32 {
+		return pack32(num{coef: v.coef.Uint64(), exp: int32(v.exp), neg: v.neg, kind: v.kind})
+	},
+	add:  (*Context).Add32,
+	sub:  (*Context).Sub32,
+	mul:  (*Context).Mul32,
+	quo:  (*Context).Quo32,
+	fma:  (*Context).FMA32,
+	sqrt: (*Context).Sqrt32,
+}
+
+func TestRandom32(t *testing.T) { runRandom(t, rand32, randomN()) }
+
 func randomN() int {
 	if testing.Short() {
 		return 20000

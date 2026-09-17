@@ -1,5 +1,10 @@
 package decimal
 
+import (
+	"encoding/binary"
+	"errors"
+)
+
 // Decimal64 is an IEEE 754 decimal64 floating-point number: 16 significant
 // decimal digits with an exponent range of [-383, 384].
 //
@@ -203,3 +208,21 @@ func (x Decimal64) Parts() (neg bool, coef uint64, exp int) {
 // Exponent returns the exponent q of x in the representation
 // coefficient × 10**q, or 0 if x is not finite.
 func (x Decimal64) Exponent() int { return int(x.unpack().exp) }
+
+// AppendBinary implements encoding.BinaryAppender. The encoding is the 8
+// bytes of the BID interchange encoding, most significant byte first.
+func (x Decimal64) AppendBinary(b []byte) ([]byte, error) {
+	return binary.BigEndian.AppendUint64(b, x.Bits()), nil
+}
+
+// MarshalBinary implements encoding.BinaryMarshaler.
+func (x Decimal64) MarshalBinary() ([]byte, error) { return x.AppendBinary(nil) }
+
+// UnmarshalBinary implements encoding.BinaryUnmarshaler.
+func (x *Decimal64) UnmarshalBinary(b []byte) error {
+	if len(b) != 8 {
+		return errors.New("decimal: invalid Decimal64 binary encoding")
+	}
+	*x = New64FromBits(binary.BigEndian.Uint64(b))
+	return nil
+}

@@ -1,7 +1,6 @@
 package decimal
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -11,11 +10,11 @@ import (
 // followed by the hexadecimal DPD encoding.
 func arg64(s string) (Decimal64, error) {
 	if len(s) > 0 && s[0] == '#' {
-		b, err := strconv.ParseUint(s[1:], 16, 64)
-		if err != nil || len(s) != 17 {
-			return Decimal64{}, errSkip
+		x, ok := hexArg64(s)
+		if !ok {
+			return x, errSkip
 		}
-		return New64FromDPD(b), nil
+		return x, nil
 	}
 	var c Context
 	x, err := c.Parse64(s)
@@ -83,13 +82,6 @@ func binaryNaN64(f func(c *Context, x, y Decimal64) string) decOp {
 		}
 		return f(c, x[0], x[1]), nil
 	}
-}
-
-func bool01(b bool) string {
-	if b {
-		return "1"
-	}
-	return "0"
 }
 
 var decOps64 = map[string]decOp{
@@ -164,18 +156,14 @@ var decOps64 = map[string]decOp{
 			return "", err
 		}
 		// decTest takes the scale as a decimal and restricts its range.
-		n, y := 0, x[1].unpack()
-		switch {
-		case x[0].IsNaN() || y.isNaN():
-			return pack64(c.nan(&format64, x[0].unpack(), y)).String(), nil
-		case y.kind != finite || y.exp != 0 || y.coef > 2*(384+16):
+		switch n, ok := scaleArg64(x[1]); {
+		case x[0].IsNaN() || x[1].IsNaN():
+			return pack64(c.nan(&format64, x[0].unpack(), x[1].unpack())).String(), nil
+		case !ok:
 			return pack64(c.invalid()).String(), nil
-		case y.neg:
-			n = -int(y.coef)
 		default:
-			n = int(y.coef)
+			return c.ScaleB64(x[0], n).String(), nil
 		}
-		return c.ScaleB64(x[0], n).String(), nil
 	},
 
 	// plus, minus and abs are arithmetic in decTest (0+x, 0-x), unlike the
@@ -218,16 +206,6 @@ func apply64(c *Context, args []string) (string, error) {
 	}
 	x, _ := c.Parse64(args[0])
 	return x.String(), nil
-}
-
-// hex64 returns the DPD encoding of a result string, which identifies the
-// result exactly, in the form decTest writes it.
-func hex64(s string) string { return fmt.Sprintf("#%016x", MustParse64(s).DPD()) }
-
-// zeroLike64 returns a zero with the exponent of x.
-func zeroLike64(x Decimal64) Decimal64 {
-	n := x.unpack()
-	return pack64(num{exp: n.exp})
 }
 
 func minMax64(max, mag bool) decOp {
