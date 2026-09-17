@@ -92,12 +92,16 @@ func (c *Context) fma(f *format, x, y, z num) num {
 	neg := x.neg != y.neg
 	if x.kind|y.kind|z.kind != finite {
 		switch {
-		case x.isNaN() || y.isNaN() || z.isNaN():
+		case x.isNaN() || y.isNaN():
+			return c.nan3(f, x, y, z)
+		case x.isZero() && y.kind == infinite, x.kind == infinite && y.isZero():
+			// 0 × Inf is invalid whatever z is. IEEE 754 leaves the case
+			// of a quiet NaN z to the implementation; like most hardware,
+			// this one treats the multiplication as having happened.
+			return c.invalid()
+		case z.isNaN():
 			return c.nan3(f, x, y, z)
 		case x.kind == infinite || y.kind == infinite:
-			if x.isZero() || y.isZero() {
-				return c.invalid() // 0 × Inf
-			}
 			if z.kind == infinite && z.neg != neg {
 				return c.invalid() // Inf - Inf
 			}

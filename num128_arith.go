@@ -149,12 +149,13 @@ func (c *Context) fma128(x, y, z num128) num128 {
 	neg := x.neg != y.neg
 	if x.kind|y.kind|z.kind != finite {
 		switch {
-		case x.isNaN() || y.isNaN() || z.isNaN():
+		case x.isNaN() || y.isNaN():
+			return c.nan3128(x, y, z)
+		case x.isZero() && y.kind == infinite, x.kind == infinite && y.isZero():
+			return c.invalid128() // 0 × Inf, whatever z is; see fma
+		case z.isNaN():
 			return c.nan3128(x, y, z)
 		case x.kind == infinite || y.kind == infinite:
-			if x.isZero() || y.isZero() {
-				return c.invalid128() // 0 × Inf
-			}
 			if z.kind == infinite && z.neg != neg {
 				return c.invalid128() // Inf - Inf
 			}

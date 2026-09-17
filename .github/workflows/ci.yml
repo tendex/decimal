@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["1.24", stable]
+        goarch: [amd64, "386"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Vet
+        run: go vet ./...
+        env:
+          GOARCH: ${{ matrix.goarch }}
+      - name: Test
+        # The reference implementation is slow on 32-bit words; the short
+        # run still covers every path.
+        run: go test ${{ matrix.goarch == '386' && '-short' || '' }} ./...
+        env:
+          GOARCH: ${{ matrix.goarch }}
+
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Format
+        run: test -z "$(gofmt -l .)"
+      - name: Generated files are up to date
+        run: |
+          go generate ./...
+          git diff --exit-code

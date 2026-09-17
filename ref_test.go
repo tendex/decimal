@@ -212,14 +212,21 @@ func (f refFormat) mul(mode RoundingMode, x, y refVal) (refVal, Flags) {
 }
 
 func (f refFormat) fma(mode RoundingMode, x, y, z refVal) (refVal, Flags) {
-	if n, fl, ok := refNaNOf(x, y, z); ok {
+	if x.kind >= quietNaN || y.kind >= quietNaN {
+		n, fl, _ := refNaNOf(x, y, z)
 		return n, fl
 	}
 	neg := x.neg != y.neg
 	if x.kind == infinite || y.kind == infinite {
+		// 0 × Inf is invalid even if z is a NaN.
 		if x.kind == finite && x.coef.Sign() == 0 || y.kind == finite && y.coef.Sign() == 0 {
 			return refNaN, Invalid
 		}
+	}
+	if n, fl, ok := refNaNOf(z); ok {
+		return n, fl
+	}
+	if x.kind == infinite || y.kind == infinite {
 		if z.kind == infinite && z.neg != neg {
 			return refNaN, Invalid
 		}

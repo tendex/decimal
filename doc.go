@@ -14,7 +14,7 @@
 // # Values
 //
 // The three types are plain values of 4, 8 and 16 bytes holding 7, 16 and 34
-// significant digits. They never allocate, their zero value is the number
+// significant digits. Arithmetic never allocates, the zero value is the number
 // zero, and every method is safe for concurrent use. All three have the
 // same methods; Decimal64 is the natural choice for most purposes, and the
 // one whose documentation is the most complete.
@@ -51,8 +51,8 @@
 //	}
 //
 // Context methods are named for the operation and the width of the format,
-// as in Add64 and Sqrt128. For every method on a decimal type there is a
-// Context method that differs only in honouring the context.
+// as in Add64 and Sqrt128. Every method on a decimal type that can round or
+// raise an exception has a Context counterpart.
 //
 // # Conformance
 //
@@ -82,3 +82,6 @@
 // form used by the encoding.TextMarshaler implementations, and therefore by
 // encoding/json.
 package decimal
+
+// The Decimal32 and Decimal128 method sets are derived from Decimal64's.
+//go:generate go run gen_formats.go
