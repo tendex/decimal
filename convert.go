@@ -125,10 +125,15 @@ func fromFloat(f float64) (neg bool, coef uint128, exp int, sticky bool) {
 	if f < 1<<63 && f == math.Trunc(f) {
 		return neg, uint128{0, uint64(f)}, 0, false
 	}
-	// f = mant × 2**e2 exactly, with mant an integer.
+	// f = mant × 2**e2 exactly, with mant an odd integer. Being odd, mant
+	// × 5**k has no trailing decimal zeros, so an exact result gets the
+	// exponent nearest the preferred exponent of zero.
 	fr, e2 := math.Frexp(f)
 	mant := uint64(fr * (1 << 53))
 	e2 -= 53
+	tz := bits.TrailingZeros64(mant)
+	mant >>= tz
+	e2 += tz
 	n := new(big.Int).SetUint64(mant)
 	if e2 >= 0 {
 		n.Lsh(n, uint(e2))

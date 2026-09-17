@@ -1,0 +1,517 @@
+package decimal
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math/rand/v2"
+	"reflect"
+	"slices"
+	"strconv"
+	"testing"
+	"unsafe"
+)
+
+func TestLayout(t *testing.T) {
+	for _, tt := range []struct {
+		v    any
+		size uintptr
+	}{
+		{Decimal32{}, 4},
+		{Decimal64{}, 8},
+		{Decimal128{}, 16},
+	} {
+		typ := reflect.TypeOf(tt.v)
+		if typ.Size() != tt.size {
+			t.Errorf("%v: size %d, want %d", typ, typ.Size(), tt.size)
+		}
+		// == would compare representations, not values. Decimal32 is the
+		// exception: nothing that forbids == is less than pointer-aligned.
+		if typ.Comparable() != (tt.size == 4) {
+			t.Errorf("%v: Comparable() = %v", typ, typ.Comparable())
+		}
+	}
+	if unsafe.Sizeof(num{}) != 16 {
+		t.Errorf("num is %d bytes; it should pass in registers", unsafe.Sizeof(num{}))
+	}
+}
+
+func TestZeroValue(t *testing.T) {
+	var z32 Decimal32
+	var z64 Decimal64
+	var z128 Decimal128
+	for _, s := range []string{z32.String(), z64.String(), z128.String()} {
+		if s != "0" {
+			t.Errorf("zero value is %s, want 0", s)
+		}
+	}
+	if b := z64.Bits(); b != 0x31C0000000000000 {
+		t.Errorf("zero Decimal64 encodes as %#x", b)
+	}
+	// Accumulating into a zero value must not disturb the exponent of the
+	// sum, which it would if the zero value were the all-zero-bits 0E-398.
+	sum := z64
+	for _, s := range []string{"1.50", "2.25", "0.25"} {
+		sum = sum.Add(MustParse64(s))
+	}
+	if got := sum.String(); got != "4.00" {
+		t.Errorf("sum = %s, want 4.00", got)
+	}
+	if got := z128.Add(MustParse128("1.5")).String(); got != "1.5" {
+		t.Errorf("0 + 1.5 = %s", got)
+	}
+}
+
+func TestParseString(t *testing.T) {
+	for _, tt := range []struct{ in, want string }{
+		{"0", "0"},
+		{"-0", "-0"},
+		{"+1", "1"},
+		{"1.50", "1.50"},
+		{".5", "0.5"},
+		{"5.", "5"},
+		{"-12.50", "-12.50"},
+		{"1E+3", "1E+3"},
+		{"1e3", "1E+3"},
+		{"1.25E+3", "1.25E+3"},
+		{"125E-2", "1.25"},
+		{"0.000001", "0.000001"},
+		{"0.0000001", "1E-7"},
+		{"0.00", "0.00"},
+		{"0E+2", "0E+2"},
+		{"00012", "12"},
+		{"1234567890123456", "1234567890123456"},
+		{"12345678901234567", "1.234567890123457E+16"}, // rounded up
+		{"12345678901234565", "1.234567890123456E+16"}, // tie, to even
+		{"12345678901234565000000000000000000000000000000001", "1.234567890123457E+49"},
+		{"9.999999999999999E+384", "9.999999999999999E+384"},
+		{"1E+385", "Infinity"},
+		{"1E-398", "1E-398"},
+		{"1E-399", "0E-398"},
+		{"1E+384", "1.000000000000000E+384"}, // clamped
+		{"0E+999999999999", "0E+369"},
+		{"0E-999999999999", "0E-398"},
+		{"1E+99999999999999999999", "Infinity"},
+		{"inf", "Infinity"},
+		{"-Infinity", "-Infinity"},
+		{"+INF", "Infinity"},
+		{"nan", "NaN"},
+		{"-NaN", "-NaN"},
+		{"NaN123", "NaN123"},
+		{"nan000", "NaN"},
+		{"sNaN", "sNaN"},
+		{"-snan42", "-sNaN42"},
+	} {
+		x, err := Parse64(tt.in)
+		if err != nil {
+			t.Errorf("Parse64(%q): %v", tt.in, err)
+			continue
+		}
+		if got := x.String(); got != tt.want {
+			t.Errorf("Parse64(%q) = %s, want %s", tt.in, got, tt.want)
+		}
+		if !x.IsCanonical() {
+			t.Errorf("Parse64(%q) is not canonical", tt.in)
+		}
+	}
+}
+
+func TestParseErrors(t *testing.T) {
+	for _, in := range []string{
+		"", "+", "-", ".", "e5", "1e", "1e+", "1.2.3", "1,5", " 1", "1 ", "0x10", "1_000",
+		"abc", "infinit", "infinityy", "nanx", "NaN1.5", "sna", "--1", "1e5.5",
+		"NaN1234567890123456", // payload does not fit
+	} {
+		x, err := Parse64(in)
+		if err == nil {
+			t.Errorf("Parse64(%q) = %v, want an error", in, x)
+			continue
+		}
+		var ne *strconv.NumError
+		if !errors.As(err, &ne) || !errors.Is(err, strconv.ErrSyntax) || ne.Num != in || ne.Func != "decimal.Parse64" {
+			t.Errorf("Parse64(%q): unexpected error %#v", in, err)
+		}
+		if !x.IsNaN() {
+			t.Errorf("Parse64(%q) returned %v with its error, want NaN", in, x)
+		}
+	}
+	var c Context
+	if _, err := c.Parse128("bogus"); err == nil || c.Flags != Invalid {
+		t.Errorf("Context.Parse128: err = %v, flags = %v", err, c.Flags)
+	}
+	defer func() {
+		if recover() == nil {
+			t.Error("MustParse32 did not panic")
+		}
+	}()
+	MustParse32("bogus")
+}
+
+func TestContextParse(t *testing.T) {
+	c := Context{Rounding: ToZero}
+	x, _ := c.Parse64("1.2345678901234567")
+	if got := x.String(); got != "1.234567890123456" || c.Flags != Inexact {
+		t.Errorf("got %s [%v]", got, c.Flags)
+	}
+	c = Context{}
+	x, _ = c.Parse64("1E-400")
+	if got := x.String(); got != "0E-398" || c.Flags != Inexact|Underflow {
+		t.Errorf("got %s [%v]", got, c.Flags)
+	}
+	c = Context{}
+	y, _ := c.Parse32("9.9999995E+96")
+	if got := y.String(); got != "Infinity" || c.Flags != Inexact|Overflow {
+		t.Errorf("got %s [%v]", got, c.Flags)
+	}
+}
+
+func TestText(t *testing.T) {
+	for _, tt := range []struct {
+		in     string
+		format byte
+		prec   int
+		want   string
+	}{
+		{"1.50", 'f', -1, "1.50"},
+		{"1.50", 'f', 0, "2"},
+		{"2.50", 'f', 0, "2"}, // ties to even
+		{"1.50", 'f', 1, "1.5"},
+		{"1.50", 'f', 4, "1.5000"},
+		{"15E+2", 'f', -1, "1500"},
+		{"15E+2", 'f', 2, "1500.00"},
+		{"0.00015", 'f', -1, "0.00015"},
+		{"0.00015", 'f', 3, "0.000"},
+		{"0.0005", 'f', 3, "0.000"},
+		{"0.0015", 'f', 3, "0.002"},
+		{"0.00051", 'f', 3, "0.001"},
+		{"0.0006", 'f', 1, "0.0"},
+		{"9.995", 'f', 2, "10.00"}, // exact tie in decimal, to even
+		{"9.985", 'f', 2, "9.98"},
+		{"999.9", 'f', 0, "1000"},
+		{"0.00", 'f', -1, "0.00"},
+		{"-0", 'f', 2, "-0.00"},
+		{"1234.5678", 'e', -1, "1.2345678e+03"},
+		{"1234.5678", 'e', 3, "1.235e+03"},
+		{"1234.5678", 'E', 0, "1E+03"},
+		{"1.50", 'e', -1, "1.50e+00"},
+		{"0", 'e', -1, "0e+00"},
+		{"0", 'e', 2, "0.00e+00"},
+		{"1E-7", 'e', -1, "1e-07"},
+		{"9.99E+384", 'e', 1, "1.0e+385"},
+		{"1E-398", 'e', -1, "1e-398"},
+		{"1234.5678", 'g', -1, "1234.5678"},
+		{"1234.5678", 'g', 3, "1.23e+03"},
+		{"1234.5678", 'g', 6, "1234.57"},
+		{"1.50", 'g', -1, "1.50"},
+		{"1E+25", 'g', -1, "1e+25"},
+		{"1E+20", 'g', -1, "100000000000000000000"},
+		{"0.00001", 'g', -1, "1e-05"},
+		{"0.0001", 'g', -1, "0.0001"},
+		{"Inf", 'f', 2, "Infinity"},
+		{"-Inf", 'e', 2, "-Infinity"},
+		{"NaN7", 'g', 2, "NaN7"},
+	} {
+		if got := MustParse64(tt.in).Text(tt.format, tt.prec); got != tt.want {
+			t.Errorf("(%s).Text(%q, %d) = %s, want %s", tt.in, tt.format, tt.prec, got, tt.want)
+		}
+	}
+}
+
+func TestFormat(t *testing.T) {
+	x := MustParse64("-1234.5678")
+	for _, tt := range []struct {
+		format string
+		v      any
+		want   string
+	}{
+		{"%v", x, "-1234.5678"},
+		{"%s", x, "-1234.5678"},
+		{"%f", x, "-1234.567800"},
+		{"%.2f", x, "-1234.57"},
+		{"%12.2f|", x, "    -1234.57|"},
+		{"%-12.2f|", x, "-1234.57    |"},
+		{"%012.2f|", x, "-00001234.57|"},
+		{"%+.1f", x.Neg(), "+1234.6"},
+		{"% .1f", x.Neg(), " 1234.6"},
+		{"%e", x, "-1.234568e+03"},
+		{"%.3E", x, "-1.235E+03"},
+		{"%g", x, "-1234.5678"},
+		{"%.3g", x, "-1.23e+03"},
+		{"%8v|", Inf64(1), "Infinity|"},
+		{"%10v|", Inf64(-1), " -Infinity|"},
+		{"%010v|", NaN64(), "       NaN|"},
+		{"%d", x, "%!d(decimal.Decimal64=-1234.5678)"},
+		{"%v", MustParse32("1.5"), "1.5"},
+		{"%.1f", MustParse128("0.25"), "0.2"},
+		{"%v", []Decimal64{New64(15, -1), New64(2, 0)}, "[1.5 2]"},
+	} {
+		if got := fmt.Sprintf(tt.format, tt.v); got != tt.want {
+			t.Errorf("Sprintf(%q) = %q, want %q", tt.format, got, tt.want)
+		}
+	}
+}
+
+func TestStringRoundTrip(t *testing.T) {
+	r := rand.New(rand.NewPCG(5, 6))
+	for i := 0; i < 200000; i++ {
+		x := New64FromBits(r.Uint64()).Canonical()
+		if i%3 == 0 {
+			x = rand64.fromRef(ref64.random(r))
+		}
+		y, err := Parse64(x.String())
+		if err != nil || y.Bits() != x.Bits() {
+			t.Fatalf("%#x -> %s -> %#x (%v)", x.Bits(), x, y.Bits(), err)
+		}
+		if d := New64FromDPD(x.DPD()); d.Bits() != x.Bits() {
+			t.Fatalf("%s: DPD round trip gives %s", x, d)
+		}
+		for _, format := range []byte{'e', 'f', 'g'} {
+			if !x.IsFinite() || format == 'f' && (x.Exponent() > 40 || x.Exponent() < -40) {
+				continue
+			}
+			z, err := Parse64(x.Text(format, -1))
+			if err != nil || !(z.Equal(x) || z.IsZero() && x.IsZero()) {
+				t.Fatalf("%s -> %s -> %s (%v)", x, x.Text(format, -1), z, err)
+			}
+		}
+
+		hi, lo := r.Uint64(), r.Uint64()
+		w := New128FromBits(hi, lo).Canonical()
+		if i%3 == 0 {
+			w = rand128.fromRef(ref128.random(r))
+		}
+		v, err := Parse128(w.String())
+		if whi, wlo := w.Bits(); err != nil || !sameBits128(v, w) {
+			t.Fatalf("%#x %#x -> %s -> %s (%v)", whi, wlo, w, v, err)
+		}
+		if d := New128FromDPD(w.DPD()); !sameBits128(d, w) {
+			t.Fatalf("%s: DPD round trip gives %s", w, d)
+		}
+
+		s := New32FromBits(r.Uint32()).Canonical()
+		u, err := Parse32(s.String())
+		if err != nil || u.Bits() != s.Bits() {
+			t.Fatalf("%#x -> %s -> %#x (%v)", s.Bits(), s, u.Bits(), err)
+		}
+		if d := New32FromDPD(s.DPD()); d.Bits() != s.Bits() {
+			t.Fatalf("%s: DPD round trip gives %s", s, d)
+		}
+	}
+}
+
+func sameBits128(x, y Decimal128) bool {
+	xh, xl := x.Bits()
+	yh, yl := y.Bits()
+	return xh == yh && xl == yl
+}
+
+func TestNonCanonical(t *testing.T) {
+	for _, tt := range []struct {
+		bits uint64
+		want string
+	}{
+		{0x6C7386F26FC0FFFF, "9999999999999999"}, // largest large-form coefficient
+		{0x6C7386F26FC10000, "0"},                // 10**16: non-canonical zero
+		{0x6C77FFFFFFFFFFFF, "0"},                // all coefficient bits set
+		{0xEC77FFFFFFFFFFFF, "-0"},
+		{0x7800000000000123, "Infinity"}, // junk below an infinity
+		{0x7C00000000000000 | 999999999999999, "NaN999999999999999"},
+		{0x7C00000000000000 | 1000000000000000, "NaN"}, // payload too large
+		{0x7DFC000000000000 | 5, "NaN5"},               // junk in the reserved bits
+		{0x7E00000000000000 | 1<<50 | 7, "sNaN7"},
+	} {
+		x := New64FromBits(tt.bits)
+		if got := x.String(); got != tt.want {
+			t.Errorf("%#x: got %s, want %s", tt.bits, got, tt.want)
+		}
+		canonical := tt.want == "9999999999999999" || tt.want == "NaN999999999999999"
+		if x.IsCanonical() != canonical {
+			t.Errorf("%#x: IsCanonical = %v", tt.bits, !canonical)
+		}
+		if c := x.Canonical(); !c.IsCanonical() || c.String() != tt.want {
+			t.Errorf("%#x: Canonical = %s (%#x)", tt.bits, c, c.Bits())
+		}
+		if x.Bits() != tt.bits {
+			t.Errorf("%#x: Bits does not round-trip", tt.bits)
+		}
+		// Arithmetic sees the value, and produces canonical results.
+		if got := x.Add(Decimal64{}); !x.IsNaN() && !got.IsCanonical() {
+			t.Errorf("%#x + 0 = %#x is not canonical", tt.bits, got.Bits())
+		}
+	}
+	// Every decimal128 encoding in large-coefficient form is a zero.
+	if x := New128FromBits(0x6000000000000000|1234, 5678); !x.IsZero() || x.IsCanonical() {
+		t.Errorf("large-form decimal128: %s", x)
+	}
+	if x := New128FromBits(0x0001ED09BEAD87C0, 0x378D8E6400000000); !x.IsZero() || x.IsCanonical() {
+		t.Errorf("decimal128 coefficient 10**34 should be a non-canonical zero: %s", x)
+	}
+	if x := New128FromBits(0x0001ED09BEAD87C0, 0x378D8E63FFFFFFFF); x.IsZero() || !x.IsCanonical() {
+		t.Errorf("decimal128 coefficient 10**34-1: %s", x)
+	}
+}
+
+func TestPredicates(t *testing.T) {
+	for _, tt := range []struct {
+		in                            string
+		class                         Class
+		sign                          int
+		finite, zero, normal, integer bool
+	}{
+		{"0", PositiveZero, 0, true, true, false, true},
+		{"-0.00", NegativeZero, 0, true, true, false, true},
+		{"1", PositiveNormal, 1, true, false, true, true},
+		{"-1.50", NegativeNormal, -1, true, false, true, false},
+		{"1.00", PositiveNormal, 1, true, false, true, true},
+		{"1E+10", PositiveNormal, 1, true, false, true, true},
+		{"1E-383", PositiveNormal, 1, true, false, true, false},
+		{"9.99E-384", PositiveSubnormal, 1, true, false, false, false},
+		{"-1E-398", NegativeSubnormal, -1, true, false, false, false},
+		{"Inf", PositiveInf, 1, false, false, false, false},
+		{"-Inf", NegativeInf, -1, false, false, false, false},
+		{"NaN", QuietNaN, 0, false, false, false, false},
+		{"-sNaN", SignalingNaN, 0, false, false, false, false},
+	} {
+		x := MustParse64(tt.in)
+		if x.Class() != tt.class || x.Sign() != tt.sign || x.IsFinite() != tt.finite ||
+			x.IsZero() != tt.zero || x.IsNormal() != tt.normal || x.IsInteger() != tt.integer {
+			t.Errorf("%s: class %v sign %d finite %v zero %v normal %v integer %v", tt.in,
+				x.Class(), x.Sign(), x.IsFinite(), x.IsZero(), x.IsNormal(), x.IsInteger())
+		}
+		w := x.Decimal128()
+		if tt.finite && (w.Sign() != tt.sign || w.IsZero() != tt.zero || w.IsInteger() != tt.integer) {
+			t.Errorf("%s as Decimal128: sign %d zero %v integer %v", tt.in, w.Sign(), w.IsZero(), w.IsInteger())
+		}
+	}
+	x := MustParse64("-sNaN")
+	if !x.IsNaN() || !x.IsSignaling() || !x.Signbit() || x.IsInf(0) {
+		t.Error("sNaN predicates")
+	}
+	if !Inf64(-1).IsInf(-1) || Inf64(-1).IsInf(1) || !Inf64(1).IsInf(0) || !Inf128(-1).IsInf(-1) || !Inf32(1).IsInf(1) {
+		t.Error("IsInf")
+	}
+	if got := NewNaN64(42, true).String(); got != "sNaN42" {
+		t.Errorf("NewNaN64 = %s", got)
+	}
+	if neg, coef, exp := MustParse64("-12.50").Parts(); !neg || coef != 1250 || exp != -2 {
+		t.Errorf("Parts = %v %d %d", neg, coef, exp)
+	}
+}
+
+func TestCompareAndSort(t *testing.T) {
+	s := []Decimal64{
+		MustParse64("3"), NaN64(), MustParse64("-Inf"), MustParse64("1.0"),
+		MustParse64("1E+2"), MustParse64("-0"), MustParse64("Inf"), MustParse64("-2.5"),
+	}
+	slices.SortFunc(s, Decimal64.Cmp)
+	if got := fmt.Sprint(s); got != "[NaN -Infinity -2.5 -0 1.0 3 1E+2 Infinity]" {
+		t.Errorf("sorted: %s", got)
+	}
+	one, uno := MustParse64("1"), MustParse64("1.000")
+	if !one.Equal(uno) || one.Less(uno) || one.Cmp(uno) != 0 || one.CmpTotal(uno) != 1 || one.SameQuantum(uno) {
+		t.Error("cohort members must be equal in value and distinct in total order")
+	}
+	if NaN64().Equal(NaN64()) || NaN64().Less(one) || NaN64().Compare(one) != Unordered {
+		t.Error("NaN comparisons")
+	}
+	if !MustParse64("-0").Equal(Decimal64{}) {
+		t.Error("-0 != +0")
+	}
+	if got := one.Reduce().Bits(); got != uno.Reduce().Bits() {
+		t.Error("Reduce does not unify a cohort")
+	}
+	var c Context
+	if c.Compare64(one, NaN64()); c.Flags != 0 {
+		t.Errorf("quiet compare raised %v", c.Flags)
+	}
+	if c.CompareSignal64(one, NaN64()); c.Flags != Invalid {
+		t.Errorf("signaling compare raised %v", c.Flags)
+	}
+	if got := one.Min(NaN64()); !got.IsNaN() {
+		t.Errorf("Min(1, NaN) = %s", got)
+	}
+	if got := c.MinNum64(one, NaN64()); !got.Equal(one) {
+		t.Errorf("MinNum(1, NaN) = %s", got)
+	}
+	if got := MustParse64("-0").Max(Decimal64{}); got.Signbit() {
+		t.Errorf("Max(-0, +0) = %s", got)
+	}
+}
+
+func TestRound(t *testing.T) {
+	for _, tt := range []struct {
+		in     string
+		places int
+		want   string
+	}{
+		{"1.2345", 2, "1.23"},
+		{"1.235", 2, "1.24"},
+		{"1.225", 2, "1.22"},
+		{"1.5", 2, "1.5"}, // never pads
+		{"1234", -2, "1.2E+3"},
+		{"1250", -2, "1.2E+3"},
+		{"-1.5", 0, "-2"},
+		{"0.004", 2, "0.00"},
+		{"Inf", 2, "Infinity"},
+		{"NaN", 2, "NaN"},
+	} {
+		if got := MustParse64(tt.in).Round(tt.places).String(); got != tt.want {
+			t.Errorf("(%s).Round(%d) = %s, want %s", tt.in, tt.places, got, tt.want)
+		}
+	}
+	c := Context{Rounding: ToNearestAway}
+	if got := c.Round64(MustParse64("1.225"), 2).String(); got != "1.23" || c.Flags != Inexact {
+		t.Errorf("half-up round: %s [%v]", got, c.Flags)
+	}
+	if got := MustParse64("1.5").Quantize(MustParse64("0.001")).String(); got != "1.500" {
+		t.Errorf("Quantize pads: %s", got)
+	}
+	if got := MustParse64("2.5").RoundToIntegral(ToNearestEven).String(); got != "2" {
+		t.Errorf("RoundToIntegral: %s", got)
+	}
+}
+
+func TestMarshal(t *testing.T) {
+	type doc struct {
+		Price Decimal64  `json:"price"`
+		Qty   Decimal32  `json:"qty"`
+		Big   Decimal128 `json:"big"`
+	}
+	in := doc{MustParse64("19.990"), MustParse32("3"), MustParse128("1E+6000")}
+	data, err := json.Marshal(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"price":"19.990","qty":"3","big":"1E+6000"}`; string(data) != want {
+		t.Errorf("json: %s, want %s", data, want)
+	}
+	var out doc
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Price.Bits() != in.Price.Bits() || out.Qty.Bits() != in.Qty.Bits() || !sameBits128(out.Big, in.Big) {
+		t.Errorf("json round trip: %+v", out)
+	}
+	if err := json.Unmarshal([]byte(`{"price":"x"}`), &out); err == nil {
+		t.Error("json: bad number accepted")
+	}
+
+	b64, _ := in.Price.MarshalBinary()
+	b32, _ := in.Qty.MarshalBinary()
+	b128, _ := in.Big.MarshalBinary()
+	if len(b32) != 4 || len(b64) != 8 || len(b128) != 16 {
+		t.Fatalf("binary sizes %d %d %d", len(b32), len(b64), len(b128))
+	}
+	var p Decimal64
+	var q Decimal32
+	var g Decimal128
+	if p.UnmarshalBinary(b64) != nil || q.UnmarshalBinary(b32) != nil || g.UnmarshalBinary(b128) != nil {
+		t.Fatal("UnmarshalBinary failed")
+	}
+	if p.Bits() != in.Price.Bits() || q.Bits() != in.Qty.Bits() || !sameBits128(g, in.Big) {
+		t.Error("binary round trip")
+	}
+	if p.UnmarshalBinary(b32) == nil || q.UnmarshalBinary(b64) == nil || g.UnmarshalBinary(b64) == nil {
+		t.Error("UnmarshalBinary accepted the wrong length")
+	}
+}

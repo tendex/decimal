@@ -12,11 +12,13 @@ import (
 // storage rather than computation. This package nevertheless gives it the
 // same complete, correctly rounded arithmetic as the larger formats.
 //
-// The zero value is +0E+0. A Decimal32 is a plain 4-byte value. Like the
-// other decimal types it deliberately does not support ==; see Decimal64.
+// The zero value is +0E+0. A Decimal32 is a plain 4-byte value.
+//
+// Unlike Decimal64 and Decimal128, Decimal32 cannot be made to reject ==
+// without doubling its size, which would defeat its purpose. Do not use ==
+// on Decimal32 values: it compares representations, so 1.0 == 1.00 is false
+// and NaN == NaN may be true. Use Equal, Cmp or CmpTotal; see Decimal64.
 type Decimal32 struct {
-	_ [0]func() // not comparable
-
 	// bits is the IEEE 754 BID interchange encoding XORed with zero32, so
 	// that the zero value of the struct is +0E+0 rather than +0E-101.
 	bits uint32

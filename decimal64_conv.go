@@ -16,8 +16,9 @@ func New64FromUint(coef uint64, exp int) Decimal64 {
 }
 
 // New64FromFloat returns the Decimal64 nearest to f: the exact binary value
-// of f, rounded once, to nearest even. The result has as many digits as the
-// format holds, not the few that would identify f: the float64 0.1 is
+// of f, rounded once, to nearest even. Values such as 2.5 that convert
+// exactly get the exponent nearest zero. All others have as many digits as
+// the format holds, not the few that would identify f: the float64 0.1 is
 // exactly 0.1000000000000000055511151231257827..., and converts to that
 // value rounded to 16 digits. To convert the way strconv prints,
 // parse the output of strconv.FormatFloat instead.
