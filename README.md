@@ -182,8 +182,10 @@ both without allocating.
   from the `Decimal64` ones by `gen_formats.go`; lookup tables by
   `gen_tables.go`. Run `go generate` after editing a `decimal64_*.go` file.
 
-## Test data
+## Licence
 
-`testdata/dectest` contains the decimal32/64/128 files of the General Decimal
-Arithmetic test cases, © IBM Corporation, which carry their own notices. Check
-their terms (the ICU licence) before publishing this repository.
+Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE); the latter records the
+provenance of the vendored conformance test cases in `testdata/dectest`, which
+are © IBM Corporation and distributed unmodified under the ICU License (see
+[testdata/dectest/LICENSE](testdata/dectest/LICENSE)). They are used only by the
+tests and are not part of the compiled package.
