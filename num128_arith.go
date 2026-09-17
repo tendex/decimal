@@ -40,25 +40,40 @@ func (c *Context) add128(x, y num128) num128 {
 		}
 		return y
 	}
+	// Align x as far toward y.exp as 38 digits allow. If that is not far
+	// enough, x has 38 digits, y is at least four digits smaller, and
+	// shifting y right with a sticky bit loses nothing that rounding to 34
+	// digits could observe; see add.
 	gap := int(x.exp - y.exp)
-	if gap+x.coef.ndigits() > 38 {
-		return c.roundWide128(c.addWide(x.wide(), y.wide()))
+	s := min(gap, 38-x.coef.ndigits())
+	xc := x.coef.scale(s)
+	exp := int(x.exp) - s
+	yc, sticky := y.coef, false
+	if gap -= s; gap > 0 {
+		if gap > 38 {
+			yc, sticky = uint128{}, !y.coef.isZero()
+		} else {
+			yc, sticky = y.coef.divPow10(gap)
+		}
 	}
-	// x can be aligned to y.exp within 128 bits; the sum is exact.
-	xc := x.coef.scale(gap)
 	var sum uint128
 	neg := x.neg
 	switch {
 	case x.neg == y.neg:
-		sum = xc.add(y.coef)
-	case y.coef.less(xc):
-		sum = xc.sub(y.coef)
-	case xc.less(y.coef):
-		sum, neg = y.coef.sub(xc), y.neg
+		sum = xc.add(yc)
+	case yc.less(xc):
+		sum = xc.sub(yc)
+		if sticky {
+			// x - (yc + ε) = (x - yc - 1) + (1 - ε)
+			sum = sum.sub64(1)
+		}
+	case xc.less(yc):
+		// Only reachable when fully aligned, so there is no sticky bit.
+		sum, neg = yc.sub(xc), y.neg
 	default:
 		neg = c.zeroSign()
 	}
-	return c.round128(neg, sum, int(y.exp), false)
+	return c.round128(neg, sum, exp, sticky)
 }
 
 // sub128 returns x - y.

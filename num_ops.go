@@ -5,7 +5,7 @@ import "math/bits"
 // cmpAbs compares the magnitudes of two finite numbers.
 func cmpAbs(x, y num) int {
 	switch {
-	case x.coef == 0 || y.coef == 0:
+	case x.coef == 0 || y.coef == 0 || x.exp == y.exp:
 		return cmpUint64(x.coef, y.coef)
 	case x.adjusted() != y.adjusted():
 		return cmpInt(x.adjusted(), y.adjusted())
@@ -194,6 +194,17 @@ func (c *Context) quantizeTo(f *format, x, y num) num {
 		return c.invalid()
 	}
 	return c.quantize(f, x, int(y.exp))
+}
+
+// quantum returns 1 × 10**x.exp, one unit in the last place of x.
+func (c *Context) quantum(f *format, x num) num {
+	switch {
+	case x.isNaN():
+		return c.nan(f, x, x)
+	case x.kind == infinite:
+		return num{kind: infinite}
+	}
+	return num{coef: 1, exp: x.exp}
 }
 
 func sameQuantum(x, y num) bool {

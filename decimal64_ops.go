@@ -45,6 +45,13 @@ func (c *Context) Quantize64(x, y Decimal64) Decimal64 {
 	return pack64(c.quantizeTo(&format64, x.unpack(), y.unpack()))
 }
 
+// Quantum64 returns the quantum of x, 1 × 10**exponent: the value of one
+// unit in the last place of its coefficient. The quantum of an infinity is
+// +Inf.
+func (c *Context) Quantum64(x Decimal64) Decimal64 {
+	return pack64(c.quantum(&format64, x.unpack()))
+}
+
 // Round64 returns x rounded to the given number of decimal places, which may
 // be negative to round to tens, hundreds and so on. Round64 only ever
 // removes digits: a value with fewer decimal places is returned unchanged.
@@ -173,6 +180,13 @@ func (x Decimal64) Max(y Decimal64) Decimal64 {
 func (x Decimal64) Quantize(y Decimal64) Decimal64 {
 	var c Context
 	return c.Quantize64(x, y)
+}
+
+// Quantum returns the quantum of x, 1 × 10**exponent; the quantum of 12.50
+// is 0.01.
+func (x Decimal64) Quantum() Decimal64 {
+	var c Context
+	return c.Quantum64(x)
 }
 
 // SameQuantum reports whether x and y have the same exponent. Two NaNs, or

@@ -50,6 +50,18 @@ func (x uint256) sub(y uint256) (z uint256) {
 
 func (x uint256) sub64(y uint64) uint256 { return x.sub(uint256{y}) }
 
+// lsh returns x<<n for n < 256.
+func (x uint256) lsh(n uint) (z uint256) {
+	words, shift := int(n/64), n%64
+	for i := 3; i >= words; i-- {
+		z[i] = x[i-words] << shift
+		if shift != 0 && i > words {
+			z[i] |= x[i-words-1] >> (64 - shift)
+		}
+	}
+	return z
+}
+
 // mul64 returns x*y. The caller guarantees the product fits in 256 bits.
 func (x uint256) mul64(y uint64) (z uint256) {
 	var carry uint64
@@ -64,10 +76,19 @@ func (x uint256) mul64(y uint64) (z uint256) {
 
 // mulPow10 returns x × 10**n. The caller guarantees the product fits.
 func (x uint256) mulPow10(n int) uint256 {
+	if x.fits128() {
+		// One 128×128 multiplication covers the first 38 digits.
+		k := min(n, 38)
+		x = x.low128().mul(pow10tab128[k])
+		n -= k
+	}
 	for ; n > 19; n -= 19 {
 		x = x.mul64(1e19)
 	}
-	return x.mul64(pow10tab[n])
+	if n > 0 {
+		x = x.mul64(pow10tab[n])
+	}
+	return x
 }
 
 // quoRem64 returns x/d and x%d for d != 0.
@@ -79,6 +100,23 @@ func (x uint256) quoRem64(d uint64) (q uint256, r uint64) {
 			continue
 		}
 		q[i], r = bits.Div64(r, x[i], d)
+	}
+	return q, r
+}
+
+// quoRemPow10 returns x / 10**k and x % 10**k for 0 <= k <= 19.
+func (x uint256) quoRemPow10(k int) (q uint256, r uint64) {
+	d, dv := pow10tab[k], &pow10div[k]
+	for i := 3; i >= 0; i-- {
+		switch {
+		case r == 0 && x[i] < d:
+			// Also the common case of leading zero words.
+			r = x[i]
+		case r == 0:
+			q[i], r = x[i]/d, x[i]%d
+		default:
+			q[i], r = dv.quoRem(r, x[i])
+		}
 	}
 	return q, r
 }
@@ -190,11 +228,11 @@ func (coef uint256) shiftRight(drop int) (uint256, remainder) {
 	lower := false
 	for ; drop > 19; drop -= 19 {
 		var r uint64
-		coef, r = coef.quoRem64(1e19)
+		coef, r = coef.quoRemPow10(19)
 		lower = lower || r != 0
 	}
 	d := pow10tab[drop]
-	q, r := coef.quoRem64(d)
+	q, r := coef.quoRemPow10(drop)
 	rem := classify(r, d/2)
 	if lower {
 		rem = rem.sticky()

@@ -11,8 +11,10 @@ func isqrt128(n uint128) uint64 {
 	// good to within one, and the loops below settle the rest.
 	s := uint64(math.Sqrt(float64(n.hi)*0x1p64 + float64(n.lo)))
 	if n.hi != 0 {
-		q, _ := n.quoRem64(s)
-		s = (s + q.lo) / 2
+		// s is about 2**32 × sqrt(n.hi), which exceeds n.hi, so the
+		// quotient fits in one word.
+		q, _ := bits.Div64(n.hi, n.lo, s)
+		s = (s + q) / 2
 	}
 	for {
 		hi, lo := bits.Mul64(s, s)

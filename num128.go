@@ -162,11 +162,9 @@ func (c *Context) roundWide128(w wide) num128 {
 		if tiny {
 			c.Flags |= Underflow
 		}
-		if roundsUp(c.Rounding, w.neg, q.lo&1 != 0, rem) {
-			if q = q.add64(1); maxCoef128.less(q) {
-				q = pow10tab128[prec128-1]
-				exp++
-			}
+		if q = q.add64(roundInc(c.Rounding, w.neg, q.lo&1, rem)); maxCoef128.less(q) {
+			q = pow10tab128[prec128-1]
+			exp++
 		}
 	}
 	if exp > emax128 {
@@ -208,7 +206,7 @@ func trailingZeros128(x uint128, max int) (uint128, int) {
 		if n+s > max {
 			continue
 		}
-		if q, r := x.quoRem64(pow10tab[s]); r == 0 {
+		if q, r := x.quoRemPow10(s); r == 0 {
 			x, n = q, n+s
 		}
 	}

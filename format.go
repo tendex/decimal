@@ -9,21 +9,29 @@ import (
 // coefficient is held as ASCII digits without leading zeros (none at all for
 // a zero coefficient), so that value = 0.d[0]d[1]... × 10**dp. For NaNs the
 // digits are the payload.
+//
+// The digits are located by offset rather than with a slice so that a text
+// does not point into itself, which would force it onto the heap.
 type text struct {
 	buf  [40]byte
-	d    []byte // digits, a slice of buf
-	dp   int    // decimal point position
-	exp  int    // the original exponent q
+	off  int // the digits are buf[off : off+nd]
+	nd   int
+	dp   int // decimal point position
+	exp  int // the original exponent q
 	neg  bool
 	kind kind
 }
+
+var zeroDigit = [...]byte{'0'}
+
+func (t *text) digits() []byte { return t.buf[t.off : t.off+t.nd] }
 
 // setCoef fills in the digits of a coefficient or payload and the exponent.
 func (t *text) setCoef(coef uint128, exp int) {
 	i := len(t.buf)
 	for coef.hi != 0 {
 		var r uint64
-		coef, r = coef.quoRem64(1e19)
+		coef, r = coef.quoRemPow10(19)
 		for j := 0; j < 19; j++ {
 			i--
 			t.buf[i] = byte('0' + r%10)
@@ -36,9 +44,9 @@ func (t *text) setCoef(coef uint128, exp int) {
 	}
 	// Splitting at 10**19 can leave leading zeros in the low chunk only
 	// when a higher chunk follows, so none remain at the front.
-	t.d = t.buf[i:]
+	t.off, t.nd = i, len(t.buf)-i
 	t.exp = exp
-	t.dp = len(t.d) + exp
+	t.dp = t.nd + exp
 }
 
 // appendSpecial appends an infinity or NaN and reports whether t is one.
@@ -50,10 +58,10 @@ func (t *text) appendSpecial(b []byte) ([]byte, bool) {
 		b = append(b, "Infinity"...)
 	case signalingNaN:
 		b = append(b, "sNaN"...)
-		b = append(b, t.d...)
+		b = append(b, t.digits()...)
 	default:
 		b = append(b, "NaN"...)
-		b = append(b, t.d...)
+		b = append(b, t.digits()...)
 	}
 	return b, true
 }
@@ -67,9 +75,9 @@ func (t *text) appendSci(b []byte) []byte {
 	if b, ok := t.appendSpecial(b); ok {
 		return b
 	}
-	d := t.d
+	d := t.digits()
 	if len(d) == 0 {
-		d = append(t.buf[:0], '0')
+		d = zeroDigit[:]
 	}
 	adj := t.exp + len(d) - 1
 	switch {
@@ -102,27 +110,29 @@ func (t *text) appendSci(b []byte) []byte {
 
 // round rounds t to n significant digits, ties to even.
 func (t *text) round(n int) {
-	if n >= len(t.d) {
+	d := t.digits()
+	if n >= len(d) {
 		return
 	}
 	if n < 0 {
-		t.d = t.d[:0]
+		t.nd = 0
 		return
 	}
-	up := t.d[n] > '5' || t.d[n] == '5' && (n+1 < len(t.d) && !allZero(t.d[n+1:]) || n > 0 && t.d[n-1]&1 != 0)
-	t.d = t.d[:n]
+	up := d[n] > '5' || d[n] == '5' && (!allZero(d[n+1:]) || n > 0 && d[n-1]&1 != 0)
+	t.nd = n
 	if !up {
 		return
 	}
 	for i := n - 1; i >= 0; i-- {
-		if t.d[i] < '9' {
-			t.d[i]++
-			t.d = t.d[:i+1]
+		if d[i] < '9' {
+			d[i]++
+			t.nd = i + 1
 			return
 		}
 	}
 	// All nines (or no digits at all): the value becomes 1 × 10**dp.
-	t.d = append(t.d[:0], '1')
+	t.off, t.nd = 0, 1
+	t.buf[0] = '1'
 	t.dp++
 }
 
@@ -138,8 +148,8 @@ func allZero(d []byte) bool {
 // digit returns the digit with weight 10**(dp-1-i), which is zero outside
 // the stored digits.
 func (t *text) digit(i int) byte {
-	if 0 <= i && i < len(t.d) {
-		return t.d[i]
+	if 0 <= i && i < t.nd {
+		return t.buf[t.off+i]
 	}
 	return '0'
 }
@@ -157,7 +167,7 @@ func (t *text) append(b []byte, format byte, prec int) []byte {
 	switch format {
 	case 'e', 'E':
 		if exact {
-			prec = max(len(t.d)-1, 0)
+			prec = max(t.nd-1, 0)
 		}
 		t.round(prec + 1)
 		return t.appendE(b, format, prec)
@@ -171,29 +181,29 @@ func (t *text) append(b []byte, format byte, prec int) []byte {
 		eprec := prec
 		if exact {
 			eprec = 21
-			prec = len(t.d)
+			prec = t.nd
 		} else {
 			if prec == 0 {
 				prec, eprec = 1, 1
 			}
 			t.round(prec)
-			if eprec > len(t.d) && len(t.d) >= t.dp {
-				eprec = len(t.d)
+			if eprec > t.nd && t.nd >= t.dp {
+				eprec = t.nd
 			}
 		}
 		// %e is used if the exponent is less than -4 or not less than the
 		// precision, as in strconv.
 		x := t.dp - 1
-		if len(t.d) == 0 {
+		if t.nd == 0 {
 			x = 0
 		}
 		if x < -4 || x >= eprec {
-			return t.appendE(b, format+'e'-'g', max(min(prec, len(t.d))-1, 0))
+			return t.appendE(b, format+'e'-'g', max(min(prec, t.nd)-1, 0))
 		}
 		if exact {
 			return t.appendF(b, max(-t.exp, 0))
 		}
-		return t.appendF(b, max(len(t.d)-t.dp, 0))
+		return t.appendF(b, max(t.nd-t.dp, 0))
 	}
 	return append(b, '%', format)
 }
@@ -208,7 +218,7 @@ func (t *text) appendE(b []byte, e byte, prec int) []byte {
 		}
 	}
 	x := t.dp - 1
-	if len(t.d) == 0 {
+	if t.nd == 0 {
 		x = 0
 	}
 	b = append(b, e)
@@ -225,7 +235,7 @@ func (t *text) appendE(b []byte, e byte, prec int) []byte {
 
 // appendF appends ddd.ddd with prec fractional digits.
 func (t *text) appendF(b []byte, prec int) []byte {
-	if len(t.d) == 0 || t.dp <= 0 {
+	if t.nd == 0 || t.dp <= 0 {
 		b = append(b, '0')
 	} else {
 		for i := 0; i < t.dp; i++ {

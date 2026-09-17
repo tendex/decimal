@@ -42,11 +42,11 @@ func (c *Context) Parse128(s string) (Decimal128, error) {
 	return pack128(n), err
 }
 
-func (x Decimal128) text() *text {
+// text unpacks x into t for conversion to characters.
+func (x Decimal128) text(t *text) {
 	n := x.unpack()
-	t := &text{neg: n.neg, kind: n.kind}
+	t.neg, t.kind = n.neg, n.kind
 	t.setCoef(n.coef, int(n.exp))
-	return t
 }
 
 // String returns x in the scientific notation defined by IEEE 754 and the
@@ -57,7 +57,12 @@ func (x Decimal128) text() *text {
 //
 // The string preserves the exponent, so Parse128(x.String()) recovers x
 // exactly, including its position in its cohort.
-func (x Decimal128) String() string { return string(x.text().appendSci(nil)) }
+func (x Decimal128) String() string {
+	var t text
+	var buf [48]byte
+	x.text(&t)
+	return string(t.appendSci(buf[:0]))
+}
 
 // Text converts x to a string in the given strconv-style format: 'e' or 'E'
 // (-d.dddde±dd), 'f' or 'F' (-ddd.ddd), or 'g' or 'G' ('e' for large
@@ -66,22 +71,33 @@ func (x Decimal128) String() string { return string(x.text().appendSci(nil)) }
 // digits for 'g'; rounding to it is to nearest even. A negative precision
 // formats x exactly, trailing zeros included.
 func (x Decimal128) Text(format byte, prec int) string {
-	return string(x.Append(nil, format, prec))
+	var buf [64]byte
+	return string(x.Append(buf[:0], format, prec))
 }
 
 // Append appends the Text form of x to b and returns the extended buffer.
 func (x Decimal128) Append(b []byte, format byte, prec int) []byte {
-	return x.text().append(b, format, prec)
+	var t text
+	x.text(&t)
+	return t.append(b, format, prec)
 }
 
 // Format implements fmt.Formatter. It accepts %v and %s (as String), and
 // %e, %E, %f, %F, %g and %G (as Text, with fmt's default precision of 6 for
 // %e and %f), along with the usual width, precision and '+', '-', ' ' and
 // '0' flags.
-func (x Decimal128) Format(s fmt.State, verb rune) { x.text().format(s, verb, "Decimal128") }
+func (x Decimal128) Format(s fmt.State, verb rune) {
+	var t text
+	x.text(&t)
+	t.format(s, verb, "Decimal128")
+}
 
 // AppendText implements encoding.TextAppender using the String form.
-func (x Decimal128) AppendText(b []byte) ([]byte, error) { return x.text().appendSci(b), nil }
+func (x Decimal128) AppendText(b []byte) ([]byte, error) {
+	var t text
+	x.text(&t)
+	return t.appendSci(b), nil
+}
 
 // MarshalText implements encoding.TextMarshaler using the String form.
 func (x Decimal128) MarshalText() ([]byte, error) { return x.AppendText(nil) }

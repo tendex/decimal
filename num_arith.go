@@ -144,13 +144,19 @@ func (c *Context) quo(f *format, x, y num) num {
 	// Rounding then always discards at least one digit, and a sticky bit
 	// for the remainder is all it needs to be correct.
 	k := f.prec + 1 + ndigits64(y.coef) - ndigits64(x.coef)
-	q, r := pow10tab128[k].mul64(x.coef).quoRem64(y.coef)
+	n := pow10tab128[k].mul64(x.coef)
+	var q, r uint64
+	if n.hi == 0 {
+		q, r = n.lo/y.coef, n.lo%y.coef
+	} else {
+		q, r = bits.Div64(n.hi, n.lo, y.coef) // the quotient fits: n.hi < y.coef
+	}
 	exp -= k
 	if r == 0 {
 		// Exact: move back toward the preferred exponent.
 		var z int
-		q.lo, z = trailingZeros64(q.lo, k)
+		q, z = trailingZeros64(q, k)
 		exp += z
 	}
-	return c.round(f, neg, q, exp, r != 0)
+	return c.round(f, neg, uint128{0, q}, exp, r != 0)
 }

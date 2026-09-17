@@ -1,6 +1,7 @@
 package decimal
 
 import (
+	"encoding/binary"
 	"math/big"
 	"math/rand/v2"
 	"testing"
@@ -9,6 +10,16 @@ import (
 func big128(x uint128) *big.Int {
 	z := new(big.Int).SetUint64(x.hi)
 	return z.Lsh(z, 64).Or(z, new(big.Int).SetUint64(x.lo))
+}
+
+// from256 converts v < 2**256, independently of the platform's word size.
+func fromBig(v *big.Int) (x uint256) {
+	var b [32]byte
+	v.FillBytes(b[:])
+	for i := range x {
+		x[i] = binary.BigEndian.Uint64(b[24-8*i:])
+	}
+	return x
 }
 
 func big256(x uint256) *big.Int {
@@ -75,6 +86,26 @@ func TestWideArithmetic(t *testing.T) {
 			t.Fatalf("%x * %x = %x, want %x", a, b, got, want)
 		}
 
+		n := uint(r.IntN(256))
+		shifted := new(big.Int).Lsh(bx, n)
+		if got := big256(x.lsh(n)); got.Cmp(shifted.Mod(shifted, mod256)) != 0 {
+			t.Fatalf("%x << %d = %x", x, n, got)
+		}
+
+		// Division by a power of ten, through the precomputed reciprocals.
+		k := r.IntN(20)
+		pow := new(big.Int).SetUint64(pow10tab[k])
+		q10, r10 := x.quoRemPow10(k)
+		wq10, wr10 := new(big.Int).QuoRem(bx, pow, new(big.Int))
+		if big256(q10).Cmp(wq10) != 0 || wr10.Uint64() != r10 {
+			t.Fatalf("%x / 1e%d = %x rem %x, want %x rem %x", x, k, q10, r10, wq10, wr10)
+		}
+		q11, r11 := a.quoRemPow10(k)
+		wq10, wr10 = wq10.QuoRem(big128(a), pow, wr10)
+		if big128(q11).Cmp(wq10) != 0 || wr10.Uint64() != r11 {
+			t.Fatalf("%x / 1e%d = %x rem %x, want %x rem %x", a, k, q11, r11, wq10, wr10)
+		}
+
 		// Division by one and two words.
 		if d := y[0]; d != 0 {
 			q, rem := x.quoRem64(d)
@@ -109,10 +140,7 @@ func TestDigitCounts(t *testing.T) {
 			if v.Sign() == 0 {
 				want = 0
 			}
-			var x uint256
-			for i, w := range v.Bits() {
-				x[i] = uint64(w)
-			}
+			x := fromBig(v)
 			if got := x.ndigits(); got != want {
 				t.Errorf("ndigits(%s) = %d, want %d", v, got, want)
 			}
@@ -143,10 +171,7 @@ func TestDigitCounts(t *testing.T) {
 			new(big.Int).Lsh(big.NewInt(1), uint(n-1)),
 			new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), uint(n)), big.NewInt(1)),
 		} {
-			var x uint256
-			for i, w := range v.Bits() {
-				x[i] = uint64(w)
-			}
+			x := fromBig(v)
 			if got, want := x.ndigits(), len(v.String()); got != want {
 				t.Errorf("ndigits(%s) = %d, want %d", v, got, want)
 			}

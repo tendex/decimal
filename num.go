@@ -1,5 +1,7 @@
 package decimal
 
+import "math/bits"
+
 // This file holds the 64-bit kernel shared by Decimal32 and Decimal64. Values
 // are unpacked into a num, operated on with 64- and 128-bit integer
 // arithmetic, and packed again, in the manner of runtime/softfloat64.go.
@@ -132,16 +134,14 @@ const (
 	remAbove                  // more than half
 )
 
+// classify compares the remainder r of a division by 2×half with half. It
+// is written without branches: on typical data each outcome is as likely as
+// the next, and mispredicted branches would cost more than the division.
 func classify(r, half uint64) remainder {
-	switch {
-	case r == 0:
-		return remZero
-	case r < half:
-		return remBelow
-	case r == half:
-		return remHalf
-	}
-	return remAbove
+	_, below := bits.Sub64(r, half, 0) // 1 if r < half
+	_, above := bits.Sub64(half, r, 0) // 1 if r > half
+	nonzero := (r | -r) >> 63
+	return remainder(nonzero + (1 - below) + above)
 }
 
 // sticky folds additional non-zero digits beyond those already classified
@@ -151,17 +151,33 @@ func (rem remainder) sticky() remainder { return rem | remBelow }
 // roundsUp reports whether a magnitude whose discarded digits are rem, and
 // which is therefore inexact, is rounded away from zero.
 func roundsUp(mode RoundingMode, neg, odd bool, rem remainder) bool {
+	var lsb uint64
+	if odd {
+		lsb = 1
+	}
+	return roundInc(mode, neg, lsb, rem) != 0
+}
+
+// roundInc returns the amount, 0 or 1, by which to increment a magnitude
+// with low bit lsb whose discarded digits are rem, which is not remZero. The
+// only branch is on the mode, which is predictable where the data are not.
+func roundInc(mode RoundingMode, neg bool, lsb uint64, rem remainder) uint64 {
+	r := uint64(rem)
 	switch mode {
 	case ToNearestEven:
-		return rem == remAbove || rem == remHalf && odd
+		return r >> 1 & (r | lsb) // above, or half and odd
 	case ToNearestAway:
-		return rem >= remHalf
+		return r >> 1
 	case ToPositiveInf:
-		return !neg
+		if !neg {
+			return 1
+		}
 	case ToNegativeInf:
-		return neg
+		if neg {
+			return 1
+		}
 	}
-	return false
+	return 0
 }
 
 // shiftRight returns coef / 10**drop, which the caller guarantees fits in 64
@@ -175,14 +191,14 @@ func shiftRight(coef uint128, drop int) (uint64, remainder) {
 		return 0, remBelow
 	case drop <= 19:
 		d := pow10tab[drop]
-		q, r := coef.quoRem64(d)
+		q, r := coef.quoRemPow10(drop)
 		return q.lo, classify(r, d/2)
 	}
 	// 10**drop does not fit in 64 bits: divide in two steps and combine the
 	// remainders, r = r2×10**19 + r1.
-	q1, r1 := coef.quoRem64(1e19)
+	q1, r1 := coef.quoRemPow10(19)
 	d := pow10tab[drop-19]
-	q2, r2 := q1.quoRem64(d)
+	q2, r2 := q1.quoRemPow10(drop - 19)
 	rem := classify(r2, d/2)
 	if r1 != 0 {
 		rem = rem.sticky()
@@ -228,11 +244,9 @@ func (c *Context) roundSlow(f *format, neg bool, coef uint128, exp int, sticky b
 		if tiny {
 			c.Flags |= Underflow
 		}
-		if roundsUp(c.Rounding, neg, q&1 != 0, rem) {
-			if q++; q > f.maxCoef {
-				q = (f.maxCoef + 1) / 10
-				exp++
-			}
+		if q += roundInc(c.Rounding, neg, q&1, rem); q > f.maxCoef {
+			q = (f.maxCoef + 1) / 10
+			exp++
 		}
 	}
 	if exp > f.emax {

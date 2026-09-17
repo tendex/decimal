@@ -47,6 +47,13 @@ func (c *Context) Quantize32(x, y Decimal32) Decimal32 {
 	return pack32(c.quantizeTo(&format32, x.unpack(), y.unpack()))
 }
 
+// Quantum32 returns the quantum of x, 1 × 10**exponent: the value of one
+// unit in the last place of its coefficient. The quantum of an infinity is
+// +Inf.
+func (c *Context) Quantum32(x Decimal32) Decimal32 {
+	return pack32(c.quantum(&format32, x.unpack()))
+}
+
 // Round32 returns x rounded to the given number of decimal places, which may
 // be negative to round to tens, hundreds and so on. Round32 only ever
 // removes digits: a value with fewer decimal places is returned unchanged.
@@ -175,6 +182,13 @@ func (x Decimal32) Max(y Decimal32) Decimal32 {
 func (x Decimal32) Quantize(y Decimal32) Decimal32 {
 	var c Context
 	return c.Quantize32(x, y)
+}
+
+// Quantum returns the quantum of x, 1 × 10**exponent; the quantum of 12.50
+// is 0.01.
+func (x Decimal32) Quantum() Decimal32 {
+	var c Context
+	return c.Quantum32(x)
 }
 
 // SameQuantum reports whether x and y have the same exponent. Two NaNs, or

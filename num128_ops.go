@@ -3,7 +3,7 @@ package decimal
 // cmpAbs128 compares the magnitudes of two finite numbers.
 func cmpAbs128(x, y num128) int {
 	switch {
-	case x.coef.isZero() || y.coef.isZero():
+	case x.coef.isZero() || y.coef.isZero() || x.exp == y.exp:
 		return x.coef.cmp(y.coef)
 	case x.adjusted() != y.adjusted():
 		return cmpInt(x.adjusted(), y.adjusted())
@@ -161,6 +161,17 @@ func (c *Context) quantizeTo128(x, y num128) num128 {
 		return c.invalid128()
 	}
 	return c.quantize128(x, int(y.exp))
+}
+
+// quantum128 returns 1 × 10**x.exp, one unit in the last place of x.
+func (c *Context) quantum128(x num128) num128 {
+	switch {
+	case x.isNaN():
+		return c.nan128(x, x)
+	case x.kind == infinite:
+		return num128{kind: infinite}
+	}
+	return num128{coef: uint128{0, 1}, exp: x.exp}
 }
 
 func sameQuantum128(x, y num128) bool {

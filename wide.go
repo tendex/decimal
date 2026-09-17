@@ -90,6 +90,54 @@ func (x uint128) mul(y uint128) uint256 {
 	return z
 }
 
+// A divisor holds the constants for dividing a two-word number by a fixed
+// one-word divisor without a division instruction (Möller and Granlund,
+// "Improved division by invariant integers", 2011): the divisor shifted left
+// by s so that its top bit is set, and m = floor((2**128-1)/d) - 2**64.
+//
+// 128-by-64-bit division is slow where it exists in hardware and absent
+// elsewhere (on arm64 bits.Div64 is a software routine), and dividing by a
+// power of ten is the inner loop of decimal rounding.
+type divisor struct {
+	d, m uint64
+	s    uint
+}
+
+// quoRem returns (hi:lo) / d and the remainder. It requires hi < d, so that
+// the quotient fits in one word.
+func (dv *divisor) quoRem(hi, lo uint64) (q, r uint64) {
+	s, d := dv.s, dv.d
+	hi = hi<<s | lo>>(64-s) // Go defines lo>>64 as 0
+	lo <<= s
+	// The estimate q is at most two too small.
+	q, t0 := bits.Mul64(dv.m, hi)
+	_, c := bits.Add64(t0, lo, 0)
+	q, _ = bits.Add64(q, hi, c)
+	ph, pl := bits.Mul64(d, q)
+	r, b := bits.Sub64(lo, pl, 0)
+	rh, _ := bits.Sub64(hi, ph, b)
+	if rh != 0 {
+		q++
+		r -= d
+	}
+	if r >= d {
+		q++
+		r -= d
+	}
+	return q, r >> s
+}
+
+// quoRemPow10 returns x / 10**k and x % 10**k for 0 <= k <= 19.
+func (x uint128) quoRemPow10(k int) (q uint128, r uint64) {
+	d := pow10tab[k]
+	if x.hi == 0 {
+		return uint128{0, x.lo / d}, x.lo % d
+	}
+	q.hi, r = x.hi/d, x.hi%d
+	q.lo, r = pow10div[k].quoRem(r, x.lo)
+	return q, r
+}
+
 // quoRem64 returns x/d and x%d for d != 0.
 func (x uint128) quoRem64(d uint64) (q uint128, r uint64) {
 	if x.hi == 0 {
@@ -127,12 +175,23 @@ func (x uint128) quoRem(d uint128) (q, r uint128) {
 
 // ndigits64 returns the number of decimal digits in x; ndigits64(0) is 0.
 func ndigits64(x uint64) int {
-	// bits.Len64(x)*log10(2) is the digit count or one less.
+	// bits.Len64(x)*log10(2) is the digit count or one less. Which one is
+	// a coin toss on typical data, so it is settled without a branch.
 	t := bits.Len64(x) * 1233 >> 12
-	if t < len(pow10tab) && x >= pow10tab[t] {
-		t++
+	_, less := bits.Sub64(x, pow10tab[t], 0)
+	return t + 1 - int(less)
+}
+
+// divPow10 returns x / 10**n for 0 < n <= 38 and whether the division left
+// a remainder.
+func (x uint128) divPow10(n int) (q uint128, inexact bool) {
+	if n <= 19 {
+		q, r := x.quoRemPow10(n)
+		return q, r != 0
 	}
-	return t
+	q, r1 := x.quoRemPow10(19)
+	q, r2 := q.quoRemPow10(n - 19)
+	return q, r1|r2 != 0
 }
 
 // ndigits returns the number of decimal digits in x; zero has no digits.

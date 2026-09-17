@@ -134,6 +134,27 @@ func fromFloat(f float64) (neg bool, coef uint128, exp int, sticky bool) {
 	tz := bits.TrailingZeros64(mant)
 	mant >>= tz
 	e2 += tz
+	if -87 <= e2 && e2 <= 192 {
+		// The exact value fits in 256 bits, as it does for all but very
+		// large and very small numbers.
+		w := uint256{mant}
+		if e2 >= 0 {
+			w = w.lsh(uint(e2))
+		} else {
+			// mant / 2**k = mant × 5**k / 10**k
+			for k := -e2; k > 0; k -= 27 {
+				w = w.mul64(pow5tab[min(k, 27)])
+			}
+			exp = e2
+		}
+		if drop := w.ndigits() - 38; drop > 0 {
+			var rem remainder
+			w, rem = w.shiftRight(drop)
+			exp += drop
+			sticky = rem != remZero
+		}
+		return neg, w.low128(), exp, sticky
+	}
 	n := new(big.Int).SetUint64(mant)
 	if e2 >= 0 {
 		n.Lsh(n, uint(e2))
@@ -185,7 +206,7 @@ func toFloat(kind kind, neg bool, coef uint128, exp int) float64 {
 		var t text
 		t.setCoef(coef, exp)
 		var scratch [64]byte
-		buf := append(scratch[:0], t.d...)
+		buf := append(scratch[:0], t.digits()...)
 		buf = append(buf, 'e')
 		buf = strconv.AppendInt(buf, int64(exp), 10)
 		f, _ = strconv.ParseFloat(string(buf), 64) // ±Inf on overflow

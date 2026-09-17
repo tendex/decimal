@@ -27,12 +27,36 @@ func main() {
 	}
 	b.WriteString("}\n\n")
 
+	b.WriteString("// pow5tab[i] is 5**i.\nvar pow5tab = [28]uint64{\n")
+	p = big.NewInt(1)
+	for i := 0; i < 28; i++ {
+		fmt.Fprintf(&b, "%s,\n", p)
+		p.Mul(p, big.NewInt(5))
+	}
+	b.WriteString("}\n\n")
+
 	b.WriteString("// pow10tab128[i] is 10**i.\nvar pow10tab128 = [39]uint128{\n")
 	p = big.NewInt(1)
 	for i := 0; i < 39; i++ {
 		hi := new(big.Int).Rsh(p, 64)
 		lo := new(big.Int).And(p, mask)
 		fmt.Fprintf(&b, "{%#x, %#x}, // 1e%d\n", hi, lo, i)
+		p.Mul(p, ten)
+	}
+	b.WriteString("}\n\n")
+
+	// Division by a power of ten is the inner loop of decimal rounding. A
+	// precomputed reciprocal turns it into two multiplications.
+	b.WriteString("// pow10div[k] divides by 10**k; see divisor.\nvar pow10div = [20]divisor{\n")
+	p = big.NewInt(1)
+	two128 := new(big.Int).Lsh(big.NewInt(1), 128)
+	two64 := new(big.Int).Lsh(big.NewInt(1), 64)
+	for i := 0; i < 20; i++ {
+		s := 64 - p.BitLen()
+		d := new(big.Int).Lsh(p, uint(s))
+		m := new(big.Int).Sub(two128, big.NewInt(1))
+		m.Quo(m, d).Sub(m, two64)
+		fmt.Fprintf(&b, "{d: %#x, m: %#x, s: %d}, // 1e%d\n", d, m, s, i)
 		p.Mul(p, ten)
 	}
 	b.WriteString("}\n\n")

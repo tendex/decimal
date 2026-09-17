@@ -47,6 +47,13 @@ func (c *Context) Quantize128(x, y Decimal128) Decimal128 {
 	return pack128(c.quantizeTo128(x.unpack(), y.unpack()))
 }
 
+// Quantum128 returns the quantum of x, 1 × 10**exponent: the value of one
+// unit in the last place of its coefficient. The quantum of an infinity is
+// +Inf.
+func (c *Context) Quantum128(x Decimal128) Decimal128 {
+	return pack128(c.quantum128(x.unpack()))
+}
+
 // Round128 returns x rounded to the given number of decimal places, which may
 // be negative to round to tens, hundreds and so on. Round128 only ever
 // removes digits: a value with fewer decimal places is returned unchanged.
@@ -175,6 +182,13 @@ func (x Decimal128) Max(y Decimal128) Decimal128 {
 func (x Decimal128) Quantize(y Decimal128) Decimal128 {
 	var c Context
 	return c.Quantize128(x, y)
+}
+
+// Quantum returns the quantum of x, 1 × 10**exponent; the quantum of 12.50
+// is 0.01.
+func (x Decimal128) Quantum() Decimal128 {
+	var c Context
+	return c.Quantum128(x)
 }
 
 // SameQuantum reports whether x and y have the same exponent. Two NaNs, or
