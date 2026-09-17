@@ -48,7 +48,9 @@ func rules(width, digits, testPrefix string, wide bool) []rule {
 		add(`\b(\w+)\.(\w+)\(&format64, `, `${1}.${2}128(`)
 		add(`\(&format64\)`, `()`)
 		add(`\bc\.invalid\(\)`, `c.invalid128()`)
+		add(`\bc\.compare\(`, `c.compare128(`)
 		add(`uint128\{0, n\.coef\}`, `n.coef`)
+		add(`\bnum\{`, `num128{`)
 		add(`\b(sameQuantum|cmpTotal)\(`, `${1}128(`)
 	}
 	add(`"dd\*`, `"`+testPrefix+`*`)

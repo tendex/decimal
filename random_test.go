@@ -108,6 +108,29 @@ var rand32 = randFormat[Decimal32]{
 
 func TestRandom32(t *testing.T) { runRandom(t, rand32, randomN()) }
 
+var rand128 = randFormat[Decimal128]{
+	ref: ref128,
+	toRef: func(x Decimal128) refVal {
+		n := x.unpack()
+		return refVal{kind: n.kind, neg: n.neg, coef: big128(n.coef), exp: int(n.exp)}
+	},
+	fromRef: func(v refVal) Decimal128 {
+		var w [2]uint64
+		for i, word := range v.coef.Bits() {
+			w[i] = uint64(word)
+		}
+		return pack128(num128{coef: uint128{w[1], w[0]}, exp: int32(v.exp), neg: v.neg, kind: v.kind})
+	},
+	add:  (*Context).Add128,
+	sub:  (*Context).Sub128,
+	mul:  (*Context).Mul128,
+	quo:  (*Context).Quo128,
+	fma:  (*Context).FMA128,
+	sqrt: (*Context).Sqrt128,
+}
+
+func TestRandom128(t *testing.T) { runRandom(t, rand128, randomN()) }
+
 func randomN() int {
 	if testing.Short() {
 		return 20000
