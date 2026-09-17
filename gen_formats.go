@@ -23,6 +23,7 @@ var sources = []string{
 	"decimal64_text.go",
 	"decimal64_conv.go",
 	"dectest64_test.go",
+	"bench64_test.go",
 }
 
 // names are the identifiers that carry the format width as a suffix: the
@@ -31,7 +32,8 @@ const names = `Add|Sub|Mul|Quo|FMA|Sqrt|Compare|CompareSignal|Min|Max|MinNum|Max
 	`Quantize|Quantum|Round|RoundToIntegralExact|RoundToIntegral|NextUp|NextDown|LogB|ScaleB|` +
 	`Reduce|Remainder|Mod|Parse|MustParse|New|Inf|NaN|NewNaN|` +
 	`arg|args|unary|binary|compare|binaryNaN|minMax|apply|hex|hexArg|zeroLike|scaleArg|` +
-	`decOps|TestDecTest`
+	`decOps|TestDecTest|` +
+	`operands|sink|digits|BenchmarkDecimal|TestBenchOperands`
 
 type rule struct {
 	re   *regexp.Regexp

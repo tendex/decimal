@@ -20,9 +20,9 @@ fmt.Println(subtotal.Add(tax))                                   // 64.92
   flags, subnormals, signed zeros, infinities, quiet and signaling NaNs with
   payloads, cohorts and preferred exponents, and both interchange encodings
   (BID and DPD).
-- **Fast.** Plain 4-, 8- and 16-byte values; arithmetic in 6–25 ns for
-  `Decimal64`; arithmetic, comparison, parsing and appending text never
-  allocate.
+- **Fast.** Plain 4-, 8- and 16-byte values; most `Decimal64` operations take
+  5–30 ns, and arithmetic, comparison, parsing and appending text never
+  allocate. See [Performance](#performance).
 - **Pure Go, no dependencies, no assembly, no cgo.** The hot paths are built
   on the `math/bits` intrinsics, which compile to single instructions.
 
@@ -144,21 +144,92 @@ go run ./internal/xcheck 100000 | python3 internal/xcheck/verify.py
 
 ## Performance
 
-`go test -bench .` on an Apple M3, Go 1.27. "Short" operands are everyday
-amounts of up to nine digits; "Full" operands use the whole precision, so
-every result needs rounding.
+The tables below come from the [benchmarks module](benchmarks), which times
+this package and compares it with `float64` and with other Go decimal
+libraries on the same operands.
 
-| ns/op | Decimal64 short | Decimal64 full | Decimal128 short | Decimal128 full |
-|-------|----------------:|---------------:|-----------------:|----------------:|
-| Add   |               8 |             16 |               13 |              37 |
-| Mul   |               6 |             15 |                6 |              52 |
-| Quo   |              22 |             26 |               64 |              78 |
-| FMA   |              38 |             54 |               47 |              95 |
-| Sqrt  |              34 |             33 |              164 |             151 |
-| Cmp   |              10 |             10 |               13 |              15 |
+"Short" operands, like the everyday amounts in the comparison, have up to nine
+significant digits, two to four of them after the decimal point, such as
+`-1234.56` (up to six digits for `Decimal32`). "Full" operands use every digit
+of the format, with one to eight before the decimal point (one to four for
+`Decimal32`), so that most results must be rounded.
 
-Parsing takes 15–30 ns (`Decimal64`) and formatting with `AppendText` 20 ns,
-both without allocating.
+<!-- benchmarks -->
+
+Measured on Apple M3 (darwin/arm64) with go1.27.1: the median of 6 runs, each of at least 250ms.
+Times are in nanoseconds per operation; allocations per operation follow in
+parentheses where there are any.
+
+#### This package
+
+| Operation          | `Decimal32` short | `Decimal32` full | `Decimal64` short | `Decimal64` full | `Decimal128` short | `Decimal128` full |
+|--------------------|------------------:|-----------------:|------------------:|-----------------:|-------------------:|------------------:|
+| `Add`              |               7.3 |               13 |               7.8 |               15 |                 12 |                33 |
+| `Sub`              |               7.7 |               13 |               7.1 |               15 |                 13 |                33 |
+| `Mul`              |               9.0 |               12 |               5.4 |               14 |                5.3 |                52 |
+| `Quo`              |                17 |               14 |                21 |               21 |                 65 |                77 |
+| `FMA`              |                48 |               47 |                40 |               54 |                 48 |                97 |
+| `Sqrt`             |                22 |               21 |                33 |               31 |                166 |               152 |
+| `Remainder`        |               8.1 |              7.9 |               7.8 |              7.9 |                 16 |                25 |
+| `Quantize` to 0.01 |                12 |               13 |                12 |               14 |                 17 |                29 |
+| `Round(2)`         |               8.2 |               12 |               7.9 |               12 |                 13 |                28 |
+| `Cmp`              |               8.6 |              8.4 |               8.4 |              8.7 |                 12 |                13 |
+| `Parse`            |                15 |               19 |                16 |               30 |                 16 |                66 |
+| `String`           |            22 (1) |           25 (1) |            22 (1) |           30 (1) |             23 (1) |            50 (1) |
+| `AppendText`       |                12 |               16 |                12 |               22 |                 13 |                41 |
+| `Int64`            |                16 |               13 |                15 |               14 |                 15 |                23 |
+| `Float64`          |               4.5 |              4.4 |               4.5 |               12 |                4.9 |           128 (1) |
+| from `float64`     |                62 |               57 |                59 |               53 |                 73 |                65 |
+
+#### Other libraries
+
+Everyday amounts, up to 9 digits:
+
+| Library                                                           |    Add |    Mul |      Quo |   Parse |  String |
+|-------------------------------------------------------------------|-------:|-------:|---------:|--------:|--------:|
+| **tendex/decimal** `Decimal64`                                    |    6.8 |    5.3 |       21 |      16 |  22 (1) |
+| `float64` (binary)                                                |    0.5 |    0.5 |      0.5 |      25 |  46 (1) |
+| [anz-bank/decimal](https://github.com/anz-bank/decimal)           |     20 |     15 |      8.4 | 149 (4) |  53 (1) |
+| [govalues/decimal](https://github.com/govalues/decimal)           |    6.6 |    4.8 |  278 (1) |      27 |  19 (1) |
+| [quagmt/udecimal](https://github.com/quagmt/udecimal)             |    8.2 |    5.7 |       17 |      13 |  28 (1) |
+| [shopspring/decimal](https://github.com/shopspring/decimal)       | 60 (4) | 23 (2) | 172 (11) |  71 (3) | 110 (4) |
+| [cockroachdb/apd](https://github.com/cockroachdb/apd)             |     31 |     30 |      100 |  82 (1) |  28 (1) |
+| [ericlagergren/decimal](https://github.com/ericlagergren/decimal) |     18 |     11 |   54 (1) |  55 (1) |  71 (4) |
+
+16 significant digits:
+
+| Library                                                           |    Add |    Mul |      Quo |   Parse |  String |
+|-------------------------------------------------------------------|-------:|-------:|---------:|--------:|--------:|
+| **tendex/decimal** `Decimal64`                                    |     14 |     14 |       21 |      30 |  30 (1) |
+| `float64` (binary)                                                |    0.5 |    0.5 |      0.5 |      50 |  45 (1) |
+| [anz-bank/decimal](https://github.com/anz-bank/decimal)           |     18 |     17 |      8.1 | 188 (4) |  47 (1) |
+| [govalues/decimal](https://github.com/govalues/decimal)           |     54 |    119 |  300 (2) |      45 |  32 (1) |
+| [quagmt/udecimal](https://github.com/quagmt/udecimal)             |    8.8 |     12 |       16 |      23 |  47 (1) |
+| [shopspring/decimal](https://github.com/shopspring/decimal)       | 89 (6) | 23 (2) | 186 (11) |  79 (3) | 100 (4) |
+| [cockroachdb/apd](https://github.com/cockroachdb/apd)             |     98 |     95 |       91 |  96 (1) |  44 (2) |
+| [ericlagergren/decimal](https://github.com/ericlagergren/decimal) |     44 | 67 (1) |   74 (2) |  78 (1) |  69 (5) |
+
+34 significant digits:
+
+| Library                                                           |     Add |     Mul |      Quo |   Parse |  String |
+|-------------------------------------------------------------------|--------:|--------:|---------:|--------:|--------:|
+| **tendex/decimal** `Decimal128`                                   |      33 |      52 |       77 |      66 |  50 (1) |
+| [woodsbury/decimal128](https://github.com/woodsbury/decimal128)   |      24 |     106 |      271 |      45 | 185 (1) |
+| [shopspring/decimal](https://github.com/shopspring/decimal)       |  85 (5) |  30 (2) | 327 (13) | 257 (5) | 141 (5) |
+| [cockroachdb/apd](https://github.com/cockroachdb/apd)             | 169 (3) | 329 (7) |  297 (6) | 329 (4) | 136 (5) |
+| [ericlagergren/decimal](https://github.com/ericlagergren/decimal) |      96 | 209 (3) |  209 (3) | 320 (4) | 146 (6) |
+
+<!-- /benchmarks -->
+
+Each library is used as its API intends, on the same operands, but they do not
+all compute the same thing: some round to significant digits, some to decimal
+places, some truncate, and some keep every digit, while `float64` cannot
+represent most of the operands at all. The fixed-point libraries hold at most
+19 digits, so they appear only at 16. A test checks that every library's
+results agree with the exact ones to within one unit in the last place, so no
+benchmark measures an error path. See
+[benchmarks/README.md](benchmarks/README.md) for the differences between the
+libraries and for how to reproduce these numbers with `benchmarks/run.sh`.
 
 ## Design
 

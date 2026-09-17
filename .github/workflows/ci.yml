@@ -37,6 +37,22 @@ jobs:
         env:
           GOARCH: ${{ matrix.goarch }}
 
+  benchmarks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: benchmarks
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: benchmarks/go.mod
+          cache-dependency-path: benchmarks/go.sum
+      - name: Vet
+        run: go vet ./...
+      - name: Libraries agree, and every benchmark runs
+        run: go test -bench . -benchtime 1x ./...
+
   generate:
     runs-on: ubuntu-latest
     steps:
