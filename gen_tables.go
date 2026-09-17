@@ -78,6 +78,8 @@ func main() {
 	b.WriteString("}\n\n")
 
 	// Densely packed decimal: declet <-> three decimal digits.
+	writePow10Float(&b)
+
 	b.WriteString("// dpd2bin[d] is the value in [0, 999] of the 10-bit DPD declet d.\nvar dpd2bin = [1024]uint16{\n")
 	var bin2dpd [1000]uint16
 	for d := 0; d < 1024; d++ {
@@ -110,6 +112,85 @@ func main() {
 	if err := os.WriteFile("tables.go", src, 0o644); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// The range of decimal exponents for which pow10float holds a power of ten.
+// A finite float64 lies between 10**-324 and 10**309, and a coefficient of at
+// most 34 digits moves the exponent of a decimal number by at most 34, so
+// these bounds cover every conversion that does not overflow or underflow.
+const (
+	minPow10Float = -360
+	maxPow10Float = 320
+)
+
+// writePow10Float writes the binary approximations of the powers of ten that
+// toFloatFast uses.
+func writePow10Float(b *bytes.Buffer) {
+	fmt.Fprintf(b, "// minPow10Float is the exponent of the first entry of pow10float.\nconst minPow10Float = %d\n\n", minPow10Float)
+	b.WriteString(`// pow10float[i-minPow10Float] approximates 10**i as a 128-bit fraction and a
+// binary exponent: p.hi:p.lo is in [2**127, 2**128) and
+//
+//	p × 2**(p.exp-128) <= 10**i < (p+1) × 2**(p.exp-128)
+//
+// so that the approximation is never above the true value and is short of it
+// by less than one unit in the last of its 128 bits.
+var pow10float = [...]struct {
+	hi, lo uint64
+	exp    int32
+}{
+`)
+	one := big.NewInt(1)
+	mask := new(big.Int).SetUint64(^uint64(0))
+	for i := minPow10Float; i <= maxPow10Float; i++ {
+		p, exp := pow10Approx(i)
+		// p × 2**(exp-128) <= 10**i < (p+1) × 2**(exp-128), with p of 128 bits.
+		if p.BitLen() != 128 {
+			log.Fatalf("10**%d: approximation has %d bits", i, p.BitLen())
+		}
+		lo, hi := new(big.Int).And(p, mask), new(big.Int).Rsh(p, 64)
+		scale := new(big.Rat).SetInt(new(big.Int).Lsh(one, 128))
+		if e := exp; e >= 0 {
+			scale.Quo(scale, new(big.Rat).SetInt(new(big.Int).Lsh(one, uint(e))))
+		} else {
+			scale.Mul(scale, new(big.Rat).SetInt(new(big.Int).Lsh(one, uint(-e))))
+		}
+		// want = 10**i × 2**(128-exp), which must lie in [p, p+1).
+		want := new(big.Rat).Mul(pow10Rat(i), scale)
+		if want.Cmp(new(big.Rat).SetInt(p)) < 0 || want.Cmp(new(big.Rat).SetInt(new(big.Int).Add(p, one))) >= 0 {
+			log.Fatalf("10**%d: %v not in [%v, %v)", i, want.FloatString(4), p, new(big.Int).Add(p, one))
+		}
+		fmt.Fprintf(b, "{%#016x, %#016x, %d}, // 1e%d\n", hi, lo, exp, i)
+	}
+	b.WriteString("}\n\n")
+}
+
+// pow10Rat returns 10**i exactly.
+func pow10Rat(i int) *big.Rat {
+	p := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(max(i, -i))), nil)
+	if i < 0 {
+		return new(big.Rat).SetFrac(big.NewInt(1), p)
+	}
+	return new(big.Rat).SetInt(p)
+}
+
+// pow10Approx returns the largest 128-bit p, and the exponent e, such that
+// p × 2**(e-128) <= 10**i.
+func pow10Approx(i int) (p *big.Int, e int) {
+	if i >= 0 {
+		p = new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(i)), nil)
+		e = p.BitLen()
+		if e <= 128 {
+			p.Lsh(p, uint(128-e))
+		} else {
+			p.Rsh(p, uint(e-128))
+		}
+		return p, e
+	}
+	// 10**i = 1 / 10**-i: the quotient of 2**(127+bits) by it has 128 bits.
+	den := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(-i)), nil)
+	e = 1 - den.BitLen()
+	p = new(big.Int).Lsh(big.NewInt(1), uint(128-e))
+	return p.Quo(p, den), e
 }
 
 // encodeDeclet packs three decimal digits into a canonical DPD declet

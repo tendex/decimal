@@ -36,6 +36,27 @@ func FuzzParse(f *testing.F) {
 	})
 }
 
+// FuzzFloat64 checks the fast conversion to float64 against the conversion
+// through digits, which strconv rounds correctly.
+func FuzzFloat64(f *testing.F) {
+	f.Add(uint64(0), uint64(1), 0)
+	f.Add(uint64(0), uint64(9007199254740993), 0) // halfway between two float64s
+	f.Add(uint64(0x1ED09BEAD87C0), uint64(0x378D8E63FFFFFFFF), -17)
+	f.Add(uint64(0), uint64(1), -324)
+	f.Add(uint64(0), uint64(17976931348623157), 292)
+	f.Fuzz(func(t *testing.T, hi, lo uint64, exp int) {
+		coef := uint128{hi, lo}
+		if maxCoef128.less(coef) || coef.isZero() || exp < emin128 || exp > emax128 {
+			t.Skip()
+		}
+		if got, ok := toFloatFast(coef, exp); ok {
+			if want := toFloatSlow(coef, exp); got != want {
+				t.Fatalf("%v × 10**%d: fast conversion gives %v, want %v", big128(coef), exp, got, want)
+			}
+		}
+	})
+}
+
 // FuzzArithmetic64 checks the arithmetic of arbitrary bit patterns, including
 // non-canonical ones, against the reference implementation.
 func FuzzArithmetic64(f *testing.F) {

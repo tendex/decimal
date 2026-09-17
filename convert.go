@@ -202,18 +202,29 @@ func toFloat(kind kind, neg bool, coef uint128, exp int) float64 {
 			f = float64(coef.lo) / float64pow10[-exp]
 		}
 	default:
-		// strconv rounds decimal strings of any length correctly.
-		var t text
-		t.setCoef(coef, exp)
-		var scratch [64]byte
-		buf := append(scratch[:0], t.digits()...)
-		buf = append(buf, 'e')
-		buf = strconv.AppendInt(buf, int64(exp), 10)
-		f, _ = strconv.ParseFloat(string(buf), 64) // ±Inf on overflow
+		var ok bool
+		if f, ok = toFloatFast(coef, exp); !ok {
+			f = toFloatSlow(coef, exp)
+		}
 	}
 	if neg {
 		f = -f
 	}
+	return f
+}
+
+// toFloatSlow returns the float64 nearest to the non-zero coef × 10**exp by
+// writing the number out and letting strconv, which rounds decimal strings
+// of any length correctly, convert it. It returns ±Inf on overflow and zero
+// on underflow.
+func toFloatSlow(coef uint128, exp int) float64 {
+	var t text
+	t.setCoef(coef, exp)
+	var scratch [64]byte
+	buf := append(scratch[:0], t.digits()...)
+	buf = append(buf, 'e')
+	buf = strconv.AppendInt(buf, int64(exp), 10)
+	f, _ := strconv.ParseFloat(string(buf), 64)
 	return f
 }
 

@@ -245,6 +245,13 @@ libraries and for how to reproduce these numbers with `benchmarks/run.sh`.
 - Rounding divides by powers of ten using precomputed reciprocals (Möller and
   Granlund) rather than division instructions, and the data-dependent steps
   of rounding are branch-free.
+- Conversion to `float64` multiplies the coefficient by a 128-bit
+  approximation of the power of ten, after Eisel and Lemire, and rounds the
+  product (`float.go`). The approximation is inexact, so the conversion
+  computes the interval the exact value lies in and uses the result only when
+  both ends round to the same `float64`; for the roughly one value in a
+  hundred that lands too close to halfway, it writes the digits out and lets
+  `strconv` decide.
 - There is no assembly. Go's targets other than POWER and IBM Z have no
   decimal instructions; what the kernels need from the hardware (wide
   multiply, add with carry, count leading zeros) the compiler already provides
