@@ -98,6 +98,13 @@ var decOps64 = map[string]decOp{
 	"multiply": binary64((*Context).Mul64),
 	"divide":   binary64((*Context).Quo64),
 	"quantize": binary64((*Context).Quantize64),
+	"fma": func(c *Context, args []string) (string, error) {
+		x, err := args64(args[:3])
+		if err != nil {
+			return "", err
+		}
+		return c.FMA64(x[0], x[1], x[2]).String(), nil
+	},
 	"remaindernear": func(c *Context, args []string) (string, error) {
 		if strings.Contains(decWantConds, "division_impossible") {
 			return "", errSkip // a General Decimal Arithmetic restriction
