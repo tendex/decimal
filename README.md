@@ -165,21 +165,21 @@ parentheses where there are any.
 | Operation          | `Decimal32` short | `Decimal32` full | `Decimal64` short | `Decimal64` full | `Decimal128` short | `Decimal128` full |
 |--------------------|------------------:|-----------------:|------------------:|-----------------:|-------------------:|------------------:|
 | `Add`              |               7.3 |               13 |               7.8 |               15 |                 12 |                33 |
-| `Sub`              |               7.7 |               13 |               7.1 |               15 |                 13 |                33 |
+| `Sub`              |               7.4 |               13 |               7.1 |               15 |                 12 |                33 |
 | `Mul`              |               9.0 |               12 |               5.4 |               14 |                5.3 |                52 |
-| `Quo`              |                17 |               14 |                21 |               21 |                 65 |                77 |
-| `FMA`              |                48 |               47 |                40 |               54 |                 48 |                97 |
-| `Sqrt`             |                22 |               21 |                33 |               31 |                166 |               152 |
+| `Quo`              |                17 |               14 |                21 |               21 |                 64 |                77 |
+| `FMA`              |                48 |               47 |                41 |               54 |                 48 |                98 |
+| `Sqrt`             |                22 |               21 |                32 |               31 |                165 |               152 |
 | `Remainder`        |               8.1 |              7.9 |               7.8 |              7.9 |                 16 |                25 |
 | `Quantize` to 0.01 |                12 |               13 |                12 |               14 |                 17 |                29 |
-| `Round(2)`         |               8.2 |               12 |               7.9 |               12 |                 13 |                28 |
-| `Cmp`              |               8.6 |              8.4 |               8.4 |              8.7 |                 12 |                13 |
-| `Parse`            |                15 |               19 |                16 |               30 |                 16 |                66 |
-| `String`           |            22 (1) |           25 (1) |            22 (1) |           30 (1) |             23 (1) |            50 (1) |
+| `Round(2)`         |               8.2 |               12 |               7.9 |               12 |                 14 |                28 |
+| `Cmp`              |               8.6 |              8.4 |               8.3 |              8.7 |                 12 |                13 |
+| `Parse`            |                15 |               18 |                16 |               30 |                 16 |                65 |
+| `String`           |            22 (1) |           25 (1) |            22 (1) |           30 (1) |             23 (1) |            49 (1) |
 | `AppendText`       |                12 |               16 |                12 |               22 |                 13 |                41 |
 | `Int64`            |                16 |               13 |                15 |               14 |                 15 |                23 |
 | `Float64`          |               4.5 |              4.4 |               4.5 |               12 |                4.9 |           128 (1) |
-| from `float64`     |                62 |               57 |                59 |               53 |                 73 |                65 |
+| from `float64`     |                62 |               57 |                59 |               52 |                 74 |                65 |
 
 #### Other libraries
 
@@ -188,13 +188,13 @@ Everyday amounts, up to 9 digits:
 | Library                                                           |    Add |    Mul |      Quo |   Parse |  String |
 |-------------------------------------------------------------------|-------:|-------:|---------:|--------:|--------:|
 | **tendex/decimal** `Decimal64`                                    |    6.8 |    5.3 |       21 |      16 |  22 (1) |
-| `float64` (binary)                                                |    0.5 |    0.5 |      0.5 |      25 |  46 (1) |
-| [anz-bank/decimal](https://github.com/anz-bank/decimal)           |     20 |     15 |      8.4 | 149 (4) |  53 (1) |
-| [govalues/decimal](https://github.com/govalues/decimal)           |    6.6 |    4.8 |  278 (1) |      27 |  19 (1) |
+| `float64` (binary)                                                |    0.5 |    0.5 |      0.5 |      25 |  45 (1) |
+| [anz-bank/decimal](https://github.com/anz-bank/decimal)           |     19 |     15 |      8.3 | 148 (4) |  52 (1) |
+| [govalues/decimal](https://github.com/govalues/decimal)           |    6.6 |    4.8 |  274 (1) |      26 |  19 (1) |
 | [quagmt/udecimal](https://github.com/quagmt/udecimal)             |    8.2 |    5.7 |       17 |      13 |  28 (1) |
 | [shopspring/decimal](https://github.com/shopspring/decimal)       | 60 (4) | 23 (2) | 172 (11) |  71 (3) | 110 (4) |
 | [cockroachdb/apd](https://github.com/cockroachdb/apd)             |     31 |     30 |      100 |  82 (1) |  28 (1) |
-| [ericlagergren/decimal](https://github.com/ericlagergren/decimal) |     18 |     11 |   54 (1) |  55 (1) |  71 (4) |
+| [ericlagergren/decimal](https://github.com/ericlagergren/decimal) |     18 |     11 |   54 (1) |  54 (1) |  71 (4) |
 
 16 significant digits:
 
@@ -202,22 +202,22 @@ Everyday amounts, up to 9 digits:
 |-------------------------------------------------------------------|-------:|-------:|---------:|--------:|--------:|
 | **tendex/decimal** `Decimal64`                                    |     14 |     14 |       21 |      30 |  30 (1) |
 | `float64` (binary)                                                |    0.5 |    0.5 |      0.5 |      50 |  45 (1) |
-| [anz-bank/decimal](https://github.com/anz-bank/decimal)           |     18 |     17 |      8.1 | 188 (4) |  47 (1) |
-| [govalues/decimal](https://github.com/govalues/decimal)           |     54 |    119 |  300 (2) |      45 |  32 (1) |
-| [quagmt/udecimal](https://github.com/quagmt/udecimal)             |    8.8 |     12 |       16 |      23 |  47 (1) |
+| [anz-bank/decimal](https://github.com/anz-bank/decimal)           |     18 |     17 |      8.1 | 187 (4) |  45 (1) |
+| [govalues/decimal](https://github.com/govalues/decimal)           |     54 |    118 |  294 (2) |      45 |  31 (1) |
+| [quagmt/udecimal](https://github.com/quagmt/udecimal)             |    8.7 |     12 |       16 |      23 |  47 (1) |
 | [shopspring/decimal](https://github.com/shopspring/decimal)       | 89 (6) | 23 (2) | 186 (11) |  79 (3) | 100 (4) |
-| [cockroachdb/apd](https://github.com/cockroachdb/apd)             |     98 |     95 |       91 |  96 (1) |  44 (2) |
-| [ericlagergren/decimal](https://github.com/ericlagergren/decimal) |     44 | 67 (1) |   74 (2) |  78 (1) |  69 (5) |
+| [cockroachdb/apd](https://github.com/cockroachdb/apd)             |     98 |     95 |       91 |  95 (1) |  44 (2) |
+| [ericlagergren/decimal](https://github.com/ericlagergren/decimal) |     44 | 67 (1) |   75 (2) |  73 (1) |  69 (5) |
 
 34 significant digits:
 
 | Library                                                           |     Add |     Mul |      Quo |   Parse |  String |
 |-------------------------------------------------------------------|--------:|--------:|---------:|--------:|--------:|
-| **tendex/decimal** `Decimal128`                                   |      33 |      52 |       77 |      66 |  50 (1) |
-| [woodsbury/decimal128](https://github.com/woodsbury/decimal128)   |      24 |     106 |      271 |      45 | 185 (1) |
-| [shopspring/decimal](https://github.com/shopspring/decimal)       |  85 (5) |  30 (2) | 327 (13) | 257 (5) | 141 (5) |
-| [cockroachdb/apd](https://github.com/cockroachdb/apd)             | 169 (3) | 329 (7) |  297 (6) | 329 (4) | 136 (5) |
-| [ericlagergren/decimal](https://github.com/ericlagergren/decimal) |      96 | 209 (3) |  209 (3) | 320 (4) | 146 (6) |
+| **tendex/decimal** `Decimal128`                                   |      33 |      52 |       76 |      66 |  50 (1) |
+| [woodsbury/decimal128](https://github.com/woodsbury/decimal128)   |      24 |     106 |      269 |      45 | 185 (1) |
+| [shopspring/decimal](https://github.com/shopspring/decimal)       |  86 (5) |  30 (2) | 329 (13) | 258 (5) | 141 (5) |
+| [cockroachdb/apd](https://github.com/cockroachdb/apd)             | 169 (3) | 328 (7) |  296 (6) | 327 (4) | 136 (5) |
+| [ericlagergren/decimal](https://github.com/ericlagergren/decimal) |      97 | 209 (3) |  208 (3) | 322 (4) | 146 (6) |
 
 <!-- /benchmarks -->
 

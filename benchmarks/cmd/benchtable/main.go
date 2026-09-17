@@ -236,6 +236,41 @@ var libraryLabels = map[string]string{
 	"woodsbury":     "[woodsbury/decimal128](https://github.com/woodsbury/decimal128)",
 }
 
+// table renders rows as a Markdown table, the first row being the header. The
+// columns are padded to a constant width, and every column but the first is
+// aligned right, which is how the repository's Markdown formatter leaves a
+// table: writing them that way here keeps regenerated tables free of changes
+// that are only whitespace.
+func table(b *bytes.Buffer, rows [][]string) {
+	width := make([]int, len(rows[0]))
+	for _, row := range rows {
+		for i, cell := range row {
+			width[i] = max(width[i], len([]rune(cell)))
+		}
+	}
+	for i, row := range rows {
+		for j, cell := range row {
+			pad := strings.Repeat(" ", width[j]-len([]rune(cell)))
+			if j == 0 {
+				fmt.Fprintf(b, "| %s%s ", cell, pad)
+			} else {
+				fmt.Fprintf(b, "| %s%s ", pad, cell)
+			}
+		}
+		b.WriteString("|\n")
+		if i == 0 {
+			for j := range row {
+				dashes := strings.Repeat("-", width[j]+2)
+				if j > 0 {
+					dashes = dashes[:len(dashes)-1] + ":"
+				}
+				fmt.Fprintf(b, "|%s", dashes)
+			}
+			b.WriteString("|\n")
+		}
+	}
+}
+
 // write writes the tables in Markdown.
 func (rs *results) write(b *bytes.Buffer) {
 	c := rs.config
@@ -244,34 +279,39 @@ func (rs *results) write(b *bytes.Buffer) {
 	b.WriteString("Times are in nanoseconds per operation; allocations per operation follow in\nparentheses where there are any.\n\n")
 
 	b.WriteString("#### This package\n\n")
-	b.WriteString("| Operation | `Decimal32` short | `Decimal32` full | `Decimal64` short | `Decimal64` full | `Decimal128` short | `Decimal128` full |\n")
-	b.WriteString("| --- | ---: | ---: | ---: | ---: | ---: | ---: |\n")
+	rows := [][]string{{"Operation"}}
+	for _, format := range []string{"Decimal32", "Decimal64", "Decimal128"} {
+		for _, size := range []string{"short", "full"} {
+			rows[0] = append(rows[0], "`"+format+"` "+size)
+		}
+	}
 	for _, op := range operations {
-		fmt.Fprintf(b, "| %s", op.label)
+		row := []string{op.label}
 		for _, format := range []string{"Decimal32", "Decimal64", "Decimal128"} {
 			for _, size := range []string{"Short", "Full"} {
-				fmt.Fprintf(b, " | %s", rs.cell(format+"/"+op.name+"/"+size))
+				row = append(row, rs.cell(format+"/"+op.name+"/"+size))
 			}
 		}
-		b.WriteString(" |\n")
+		rows = append(rows, row)
 	}
+	table(b, rows)
 
 	b.WriteString("\n#### Other libraries\n")
 	for _, w := range workloads {
 		fmt.Fprintf(b, "\n%s:\n\n", w.title)
-		b.WriteString("| Library | Add | Mul | Quo | Parse | String |\n")
-		b.WriteString("| --- | ---: | ---: | ---: | ---: | ---: |\n")
+		rows := [][]string{{"Library", "Add", "Mul", "Quo", "Parse", "String"}}
 		for _, lib := range w.libraries {
 			label := libraryLabels[lib]
 			if lib == "tendex" {
 				label = "**tendex/decimal** `" + w.tendex + "`"
 			}
-			fmt.Fprintf(b, "| %s", label)
+			row := []string{label}
 			for _, op := range []string{"Add", "Mul", "Quo", "Parse", "String"} {
-				fmt.Fprintf(b, " | %s", rs.cell(w.name+"/"+op+"/"+lib))
+				row = append(row, rs.cell(w.name+"/"+op+"/"+lib))
 			}
-			b.WriteString(" |\n")
+			rows = append(rows, row)
 		}
+		table(b, rows)
 	}
 }
 
