@@ -73,6 +73,74 @@ func ExampleDecimal64_Quantize() {
 	// 0E+1
 }
 
+// IEEE 754 rounds to a power of ten, with Quantize, but has no operation that
+// rounds to a multiple of an arbitrary increment such as a tick size of 0.05.
+// Mod and Remainder are exact, so subtracting them from x gives a multiple of
+// the increment without rounding: only the subtraction can round, and only
+// when the multiple does not fit the 16 digits of the format.
+func ExampleDecimal64_Mod_roundToIncrement() {
+	tick := decimal.MustParse64("0.05")
+
+	// Mod has the sign of x, so this rounds toward zero.
+	down := func(x decimal.Decimal64) decimal.Decimal64 {
+		return x.Sub(x.Mod(tick))
+	}
+	floor := func(x decimal.Decimal64) decimal.Decimal64 {
+		m := down(x)
+		if x.Less(m) {
+			m = m.Sub(tick)
+		}
+		return m
+	}
+	ceil := func(x decimal.Decimal64) decimal.Decimal64 {
+		m := down(x)
+		if m.Less(x) {
+			m = m.Add(tick)
+		}
+		return m
+	}
+	// Remainder is x - n×tick for the integer n nearest x/tick, so this
+	// rounds to the nearest multiple, and a tie to the even one.
+	nearest := func(x decimal.Decimal64) decimal.Decimal64 {
+		return x.Sub(x.Remainder(tick))
+	}
+
+	for _, s := range []string{"10.12", "-10.12", "10.14", "10.15", "10.125", "10.175"} {
+		x := decimal.MustParse64(s)
+		fmt.Printf("%7v: down %v, floor %v, ceil %v, nearest %v\n", x, down(x), floor(x), ceil(x), nearest(x))
+	}
+	// Output:
+	//   10.12: down 10.10, floor 10.10, ceil 10.15, nearest 10.10
+	//  -10.12: down -10.10, floor -10.15, ceil -10.10, nearest -10.10
+	//   10.14: down 10.10, floor 10.10, ceil 10.15, nearest 10.15
+	//   10.15: down 10.15, floor 10.15, ceil 10.15, nearest 10.15
+	//  10.125: down 10.100, floor 10.100, ceil 10.150, nearest 10.100
+	//  10.175: down 10.150, floor 10.150, ceil 10.200, nearest 10.200
+}
+
+// None of the five IEEE 754 rounding directions rounds away from zero. The
+// sign of x says which of the two directed ones does.
+func ExampleContext_Round64_awayFromZero() {
+	away := func(x decimal.Decimal64, places int) decimal.Decimal64 {
+		c := decimal.Context{Rounding: decimal.ToPositiveInf}
+		if x.Signbit() {
+			c.Rounding = decimal.ToNegativeInf
+		}
+		return c.Round64(x, places)
+	}
+
+	for _, s := range []string{"2.341", "-2.341", "2.34", "0.001", "-0.001"} {
+		x := decimal.MustParse64(s)
+		fmt.Printf("%6v: %v\n", x, away(x, 2))
+	}
+	// Output:
+	//  2.341: 2.35
+	// -2.341: -2.35
+	//   2.34: 2.34
+	//  0.001: 0.01
+	// -0.001: -0.01
+}
+
 func ExampleDecimal64_Format() {
 	x := decimal.MustParse64("1234.5")
 	fmt.Printf("%v|%.2f|%10.1f|%e|%g\n", x, x, x, x, x)
