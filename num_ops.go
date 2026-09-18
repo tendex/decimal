@@ -370,3 +370,68 @@ func (c *Context) rem(f *format, x, y num, nearest bool) num {
 	}
 	return c.round(f, neg, uint128{0, r}, int(exp), false)
 }
+
+// classifyRem classifies the remainder r of a division by d, r < d, against
+// half of d.
+func classifyRem(r, d uint64) remainder {
+	if r == 0 {
+		return remZero
+	}
+	return remBelow + remainder(1+cmpUint64(2*r, d))
+}
+
+// roundToMultiple returns x rounded to a multiple of y, which must be finite
+// and positive, with the exponent of y: quantize generalized from a power of
+// ten to any increment.
+func (c *Context) roundToMultiple(f *format, x, y num) num {
+	switch {
+	case x.isNaN() || y.isNaN():
+		return c.nan(f, x, y)
+	case x.kind == infinite || y.kind == infinite || y.neg || y.coef == 0:
+		return c.invalid()
+	case x.coef == 0:
+		x.exp = y.exp
+		return x
+	}
+	// The exact quotient x / y is a ratio of the coefficients scaled to the
+	// smaller exponent; t is its integer part and rem classifies the rest.
+	var t uint64
+	var rem remainder
+	gap := int(x.exp - y.exp)
+	switch {
+	case gap >= 0:
+		// Scaling x by more than prec digits puts every multiple of y near
+		// it past prec digits.
+		if gap > f.prec {
+			return c.invalid()
+		}
+		q, r := uint128{0, x.coef}.mul64(pow10tab[gap]).quoRem64(y.coef)
+		if q.hi != 0 || q.lo > f.maxCoef {
+			return c.invalid()
+		}
+		t, rem = q.lo, classifyRem(r, y.coef)
+	case -gap > f.prec+1:
+		// y is more than twice x: the quotient is below a half.
+		rem = remBelow
+	default:
+		d := uint128{0, y.coef}.mul64(pow10tab[-gap])
+		if d.hi != 0 || d.lo > x.coef {
+			// A proper fraction: twice x against the divisor decides.
+			rem = remBelow + remainder(1+uint128{0, 2 * x.coef}.cmp(d))
+		} else {
+			t, rem = x.coef/d.lo, classifyRem(x.coef%d.lo, d.lo)
+		}
+	}
+	var inc uint64
+	if rem != remZero {
+		inc = roundInc(c.Rounding, x.neg, t&1, rem)
+	}
+	hi, lo := bits.Mul64(t+inc, y.coef)
+	if hi != 0 || lo > f.maxCoef {
+		return c.invalid()
+	}
+	if rem != remZero {
+		c.Flags |= Inexact
+	}
+	return num{coef: lo, exp: y.exp, neg: x.neg}
+}

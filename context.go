@@ -2,18 +2,20 @@ package decimal
 
 import "strings"
 
-// RoundingMode is an IEEE 754 rounding-direction attribute. The names follow
-// math/big.
+// RoundingMode is a rounding direction: one of the five IEEE 754
+// rounding-direction attributes, or AwayFromZero. The names follow math/big.
 type RoundingMode uint8
 
-// The five IEEE 754 rounding directions. The zero value, ToNearestEven, is
-// the IEEE 754 default.
+// The five IEEE 754 rounding directions, and AwayFromZero, the round-up of
+// the General Decimal Arithmetic specification, which IEEE 754 lacks. The
+// zero value, ToNearestEven, is the IEEE 754 default.
 const (
 	ToNearestEven RoundingMode = iota // roundTiesToEven
 	ToNearestAway                     // roundTiesToAway
 	ToZero                            // roundTowardZero
 	ToPositiveInf                     // roundTowardPositive
 	ToNegativeInf                     // roundTowardNegative
+	AwayFromZero                      // round-up: away from zero; not IEEE 754
 )
 
 // String returns the name of the rounding mode.
@@ -29,6 +31,8 @@ func (m RoundingMode) String() string {
 		return "ToPositiveInf"
 	case ToNegativeInf:
 		return "ToNegativeInf"
+	case AwayFromZero:
+		return "AwayFromZero"
 	}
 	return "RoundingMode(" + itoa(int(m)) + ")"
 }

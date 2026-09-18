@@ -56,15 +56,16 @@ var decClassNames = [...]string{
 	PositiveInf:       "+Infinity",
 }
 
-// decRounding maps the decTest rounding names to IEEE 754 modes. The other
-// General Decimal Arithmetic modes (up, half_down, 05up) are not IEEE 754
-// modes and those cases are skipped.
+// decRounding maps the decTest rounding names to the modes of this package:
+// the five of IEEE 754 and round-up. The other General Decimal Arithmetic
+// modes (half_down, 05up) are not provided and those cases are skipped.
 var decRounding = map[string]RoundingMode{
 	"half_even": ToNearestEven,
 	"half_up":   ToNearestAway,
 	"down":      ToZero,
 	"ceiling":   ToPositiveInf,
 	"floor":     ToNegativeInf,
+	"up":        AwayFromZero,
 }
 
 // decConditions maps decTest conditions to IEEE 754 flags. Clamped, Rounded,

@@ -18,7 +18,7 @@ import (
 	d "github.com/tendex/decimal"
 )
 
-var modes = []string{"ROUND_HALF_EVEN", "ROUND_HALF_UP", "ROUND_DOWN", "ROUND_CEILING", "ROUND_FLOOR"}
+var modes = []string{"ROUND_HALF_EVEN", "ROUND_HALF_UP", "ROUND_DOWN", "ROUND_CEILING", "ROUND_FLOOR", "ROUND_UP"}
 
 func operand(r *rand.Rand, prec, emax int) string {
 	switch r.IntN(30) {
@@ -78,7 +78,7 @@ func main() {
 	n, _ := strconv.Atoi(os.Args[1])
 	r := rand.New(rand.NewPCG(2026, 917))
 	for i := 0; i < n; i++ {
-		m := r.IntN(5)
+		m := r.IntN(6)
 		mode := d.RoundingMode(m)
 		{
 			x, y, z := operand(r, 16, 384), operand(r, 16, 384), operand(r, 16, 384)

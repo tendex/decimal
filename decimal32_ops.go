@@ -47,6 +47,20 @@ func (c *Context) Quantize32(x, y Decimal32) Decimal32 {
 	return pack32(c.quantizeTo(&format32, x.unpack(), y.unpack()))
 }
 
+// RoundToMultiple32 returns x rounded, in the direction of the context, to a
+// multiple of y, which must be finite and positive. The result has the
+// exponent of y, as Quantize32 gives it: 10.12 rounded to a multiple of 0.05
+// is 10.10, and to a multiple of 0.25 is 10.00. Quantize32 is the special
+// case of y a power of ten. It raises Inexact if the result differs from x,
+// and Invalid, returning a NaN, if x is infinite, if y is not a finite
+// positive number, or if the result would need more than 7 digits.
+//
+// The result divided by y is the number of multiples, an integer that Quo32
+// returns exactly; in ToZero that is the integer quotient of x / y.
+func (c *Context) RoundToMultiple32(x, y Decimal32) Decimal32 {
+	return pack32(c.roundToMultiple(&format32, x.unpack(), y.unpack()))
+}
+
 // Quantum32 returns the quantum of x, 1 × 10**exponent: the value of one
 // unit in the last place of its coefficient. The quantum of an infinity is
 // +Inf.
@@ -182,6 +196,14 @@ func (x Decimal32) Max(y Decimal32) Decimal32 {
 func (x Decimal32) Quantize(y Decimal32) Decimal32 {
 	var c Context
 	return c.Quantize32(x, y)
+}
+
+// RoundToMultiple returns x rounded, to nearest even, to a multiple of y,
+// such as a tick size or a coin: 10.12 to a multiple of 0.05 is 10.10. The
+// result has the exponent of y. See Context.RoundToMultiple32.
+func (x Decimal32) RoundToMultiple(y Decimal32) Decimal32 {
+	var c Context
+	return c.RoundToMultiple32(x, y)
 }
 
 // Quantum returns the quantum of x, 1 × 10**exponent; the quantum of 12.50

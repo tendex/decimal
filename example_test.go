@@ -76,63 +76,47 @@ func ExampleDecimal64_Quantize() {
 
 // IEEE 754 rounds to a power of ten, with Quantize, but has no operation that
 // rounds to a multiple of an arbitrary increment such as a tick size of 0.05.
-// Mod and Remainder are exact, so subtracting them from x gives a multiple of
-// the increment without rounding: only the subtraction can round, and only
-// when the multiple does not fit the 16 digits of the format.
-func ExampleDecimal64_Mod_roundToIncrement() {
+// RoundToMultiple does, in one rounding.
+func ExampleDecimal64_RoundToMultiple() {
 	tick := decimal.MustParse64("0.05")
-
-	// Mod has the sign of x, so this rounds toward zero.
-	down := func(x decimal.Decimal64) decimal.Decimal64 {
-		return x.Sub(x.Mod(tick))
-	}
-	floor := func(x decimal.Decimal64) decimal.Decimal64 {
-		m := down(x)
-		if x.Less(m) {
-			m = m.Sub(tick)
-		}
-		return m
-	}
-	ceil := func(x decimal.Decimal64) decimal.Decimal64 {
-		m := down(x)
-		if m.Less(x) {
-			m = m.Add(tick)
-		}
-		return m
-	}
-	// Remainder is x - n×tick for the integer n nearest x/tick, so this
-	// rounds to the nearest multiple, and a tie to the even one.
-	nearest := func(x decimal.Decimal64) decimal.Decimal64 {
-		return x.Sub(x.Remainder(tick))
-	}
-
-	for _, s := range []string{"10.12", "-10.12", "10.14", "10.15", "10.125", "10.175"} {
+	for _, s := range []string{"10.12", "-10.12", "10.14", "10.125", "10.175"} {
 		x := decimal.MustParse64(s)
-		fmt.Printf("%7v: down %v, floor %v, ceil %v, nearest %v\n", x, down(x), floor(x), ceil(x), nearest(x))
+		fmt.Printf("%7v: %v\n", x, x.RoundToMultiple(tick))
 	}
+	fmt.Println(decimal.MustParse64("1234.5").RoundToMultiple(decimal.New64(25, 0)))
 	// Output:
-	//   10.12: down 10.10, floor 10.10, ceil 10.15, nearest 10.10
-	//  -10.12: down -10.10, floor -10.15, ceil -10.10, nearest -10.10
-	//   10.14: down 10.10, floor 10.10, ceil 10.15, nearest 10.15
-	//   10.15: down 10.15, floor 10.15, ceil 10.15, nearest 10.15
-	//  10.125: down 10.100, floor 10.100, ceil 10.150, nearest 10.100
-	//  10.175: down 10.150, floor 10.150, ceil 10.200, nearest 10.200
+	//   10.12: 10.10
+	//  -10.12: -10.10
+	//   10.14: 10.15
+	//  10.125: 10.10
+	//  10.175: 10.20
+	// 1225
 }
 
-// None of the five IEEE 754 rounding directions rounds away from zero. The
-// sign of x says which of the two directed ones does.
-func ExampleContext_Round64_awayFromZero() {
-	away := func(x decimal.Decimal64, places int) decimal.Decimal64 {
-		c := decimal.Context{Rounding: decimal.ToPositiveInf}
-		if x.Signbit() {
-			c.Rounding = decimal.ToNegativeInf
-		}
-		return c.Round64(x, places)
+func ExampleContext_RoundToMultiple64() {
+	x, tick := decimal.MustParse64("10.12"), decimal.MustParse64("0.05")
+	for _, mode := range []decimal.RoundingMode{
+		decimal.ToNearestEven, decimal.ToZero, decimal.ToPositiveInf, decimal.ToNegativeInf, decimal.AwayFromZero,
+	} {
+		c := decimal.Context{Rounding: mode}
+		fmt.Printf("%-13v %v %v %v\n", mode, c.RoundToMultiple64(x, tick), c.RoundToMultiple64(x.Neg(), tick), c.Flags)
 	}
+	// Output:
+	// ToNearestEven 10.10 -10.10 Inexact
+	// ToZero        10.10 -10.10 Inexact
+	// ToPositiveInf 10.15 -10.10 Inexact
+	// ToNegativeInf 10.10 -10.15 Inexact
+	// AwayFromZero  10.15 -10.15 Inexact
+}
 
+// None of the five IEEE 754 rounding directions rounds away from zero, which
+// is how fees and margins are often rounded. AwayFromZero, the round-up of
+// the General Decimal Arithmetic specification, does.
+func ExampleContext_Round64_awayFromZero() {
+	c := decimal.Context{Rounding: decimal.AwayFromZero}
 	for _, s := range []string{"2.341", "-2.341", "2.34", "0.001", "-0.001"} {
 		x := decimal.MustParse64(s)
-		fmt.Printf("%6v: %v\n", x, away(x, 2))
+		fmt.Printf("%6v: %v\n", x, c.Round64(x, 2))
 	}
 	// Output:
 	//  2.341: 2.35

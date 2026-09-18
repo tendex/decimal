@@ -98,6 +98,8 @@ func (f refFormat) round(mode RoundingMode, neg bool, coef *big.Int, exp int, st
 			up = !neg
 		case ToNegativeInf:
 			up = neg
+		case AwayFromZero:
+			up = true
 		}
 		if up {
 			coef.Add(coef, big.NewInt(1))
@@ -311,6 +313,49 @@ func (f refFormat) sqrt(mode RoundingMode, x refVal) (refVal, Flags) {
 		exp += stripZeros(s, x.exp>>1-exp)
 	}
 	return f.round(mode, false, s, exp, !exact)
+}
+
+// roundToMultiple rounds x to a multiple of y, with y's exponent.
+func (f refFormat) roundToMultiple(mode RoundingMode, x, y refVal) (refVal, Flags) {
+	if n, fl, ok := refNaNOf(x, y); ok {
+		return n, fl
+	}
+	if x.kind == infinite || y.kind == infinite || y.neg || y.coef.Sign() == 0 {
+		return refNaN, Invalid
+	}
+	if x.coef.Sign() == 0 {
+		return refVal{neg: x.neg, coef: new(big.Int), exp: y.exp}, 0
+	}
+	exp := min(x.exp, y.exp)
+	n := new(big.Int).Mul(x.coef, refPow10(x.exp-exp))
+	d := new(big.Int).Mul(y.coef, refPow10(y.exp-exp))
+	t, rem := new(big.Int).QuoRem(n, d, new(big.Int))
+	var flags Flags
+	if rem.Sign() != 0 {
+		flags = Inexact
+		twice := rem.Lsh(rem, 1).Cmp(d)
+		var up bool
+		switch mode {
+		case ToNearestEven:
+			up = twice > 0 || twice == 0 && t.Bit(0) == 1
+		case ToNearestAway:
+			up = twice >= 0
+		case ToPositiveInf:
+			up = !x.neg
+		case ToNegativeInf:
+			up = x.neg
+		case AwayFromZero:
+			up = true
+		}
+		if up {
+			t.Add(t, big.NewInt(1))
+		}
+	}
+	coef := t.Mul(t, y.coef)
+	if refDigits(coef) > f.prec {
+		return refNaN, Invalid
+	}
+	return refVal{neg: x.neg, coef: coef, exp: y.exp}, flags
 }
 
 // random returns a random operand, biased toward the values that break

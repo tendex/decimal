@@ -329,3 +329,63 @@ func (c *Context) rem128(x, y num128, nearest bool) num128 {
 	}
 	return c.round128(neg, r, int(exp), false)
 }
+
+// classifyRem128 classifies the remainder r of a division by d, r < d,
+// against half of d.
+func classifyRem128(r, d uint128) remainder {
+	if r.isZero() {
+		return remZero
+	}
+	return remBelow + remainder(1+r.lsh(1).cmp(d))
+}
+
+// roundToMultiple128 returns x rounded to a multiple of y; see
+// roundToMultiple.
+func (c *Context) roundToMultiple128(x, y num128) num128 {
+	switch {
+	case x.isNaN() || y.isNaN():
+		return c.nan128(x, y)
+	case x.kind == infinite || y.kind == infinite || y.neg || y.coef.isZero():
+		return c.invalid128()
+	case x.coef.isZero():
+		x.exp = y.exp
+		return x
+	}
+	var t uint128
+	var rem remainder
+	gap := int(x.exp - y.exp)
+	switch {
+	case gap >= 0:
+		if gap > prec128 {
+			return c.invalid128()
+		}
+		q, r := u256(x.coef).mulPow10(gap).quoRem128(y.coef)
+		if !q.fits128() || maxCoef128.less(q.low128()) {
+			return c.invalid128()
+		}
+		t, rem = q.low128(), classifyRem128(r, y.coef)
+	case -gap > prec128+1:
+		rem = remBelow
+	default:
+		d := u256(y.coef).mulPow10(-gap)
+		if !d.fits128() || x.coef.less(d.low128()) {
+			rem = remBelow + remainder(1+u256(x.coef).lsh(1).cmp(d))
+		} else {
+			var r uint128
+			t, r = x.coef.quoRem(d.low128())
+			rem = classifyRem128(r, d.low128())
+		}
+	}
+	var inc uint64
+	if rem != remZero {
+		inc = roundInc(c.Rounding, x.neg, t.lo&1, rem)
+	}
+	p := t.add64(inc).mul(y.coef)
+	if !p.fits128() || maxCoef128.less(p.low128()) {
+		return c.invalid128()
+	}
+	if rem != remZero {
+		c.Flags |= Inexact
+	}
+	return num128{coef: p.low128(), exp: y.exp, neg: x.neg}
+}

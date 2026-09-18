@@ -15,6 +15,7 @@ type randFormat[T any] struct {
 	add, sub, mul, quo func(*Context, T, T) T
 	fma                func(*Context, T, T, T) T
 	sqrt               func(*Context, T) T
+	roundToMultiple    func(*Context, T, T) T
 }
 
 // runRandom checks the arithmetic operations against the reference
@@ -23,7 +24,7 @@ func runRandom[T any](t *testing.T, rf randFormat[T], n int) {
 	r := rand.New(rand.NewPCG(uint64(rf.ref.prec), 754))
 	f := rf.ref
 	for i := 0; i < n; i++ {
-		mode := RoundingMode(r.IntN(5))
+		mode := RoundingMode(r.IntN(6))
 		rx, ry, rz := f.random(r), f.random(r), f.random(r)
 		if r.IntN(4) == 0 && ry.kind == finite && rx.kind == finite {
 			// Nearly equal magnitudes, for cancellation.
@@ -31,6 +32,11 @@ func runRandom[T any](t *testing.T, rf randFormat[T], n int) {
 			if r.IntN(2) == 0 && ry.coef.Sign() != 0 {
 				ry.coef.Sub(ry.coef, big.NewInt(1))
 			}
+		} else if r.IntN(4) == 0 && ry.kind == finite && rx.kind == finite {
+			// A tick size near the exponent of x, for rounding to a multiple.
+			ry.neg = false
+			ry.coef.SetInt64([...]int64{1, 2, 5, 25, 125, 3, 7, 10, 500}[r.IntN(9)])
+			ry.exp = max(rx.exp+1-r.IntN(f.prec+3), f.emin)
 		}
 		checkArithmetic(t, rf, mode, rf.fromRef(rx), rf.fromRef(ry), rf.fromRef(rz))
 	}
@@ -78,6 +84,11 @@ func checkArithmetic[T any](t testing.TB, rf randFormat[T], mode RoundingMode, x
 	got = rf.sqrt(&c, x)
 	want, wantFlags = f.sqrt(mode, rx)
 	check("sqrt", mode, got, c.Flags, want, wantFlags, rx)
+
+	c = Context{Rounding: mode}
+	got = rf.roundToMultiple(&c, x, y)
+	want, wantFlags = f.roundToMultiple(mode, rx, ry)
+	check("roundToMultiple", mode, got, c.Flags, want, wantFlags, rx, ry)
 }
 
 var rand64 = randFormat[Decimal64]{
@@ -95,6 +106,8 @@ var rand64 = randFormat[Decimal64]{
 	quo:  (*Context).Quo64,
 	fma:  (*Context).FMA64,
 	sqrt: (*Context).Sqrt64,
+
+	roundToMultiple: (*Context).RoundToMultiple64,
 }
 
 var rand32 = randFormat[Decimal32]{
@@ -112,6 +125,8 @@ var rand32 = randFormat[Decimal32]{
 	quo:  (*Context).Quo32,
 	fma:  (*Context).FMA32,
 	sqrt: (*Context).Sqrt32,
+
+	roundToMultiple: (*Context).RoundToMultiple32,
 }
 
 func TestRandom32(t *testing.T) { runRandom(t, rand32, randomN()) }
@@ -131,6 +146,8 @@ var rand128 = randFormat[Decimal128]{
 	quo:  (*Context).Quo128,
 	fma:  (*Context).FMA128,
 	sqrt: (*Context).Sqrt128,
+
+	roundToMultiple: (*Context).RoundToMultiple128,
 }
 
 func TestRandom128(t *testing.T) { runRandom(t, rand128, randomN()) }

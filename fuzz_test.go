@@ -64,7 +64,7 @@ func FuzzArithmetic64(f *testing.F) {
 	f.Add(uint64(0x6C7386F26FC0FFFF), uint64(0x77FB86F26FC0FFFF), uint64(0xB1C0000000000001), uint8(3))
 	f.Add(uint64(0x7C00000000000001), uint64(0x7E00000000000002), uint64(0xF800000000000000), uint8(4))
 	f.Fuzz(func(t *testing.T, a, b, c uint64, mode uint8) {
-		checkArithmetic(t, rand64, RoundingMode(mode%5), New64FromBits(a), New64FromBits(b), New64FromBits(c))
+		checkArithmetic(t, rand64, RoundingMode(mode%6), New64FromBits(a), New64FromBits(b), New64FromBits(c))
 	})
 }
 
@@ -74,7 +74,7 @@ func FuzzArithmetic128(f *testing.F) {
 	f.Add(uint64(0x0001ED09BEAD87C0), uint64(0x378D8E63FFFFFFFF), uint64(0x5FFFED09BEAD87C0), uint64(0x378D8E63FFFFFFFF),
 		uint64(0xB040000000000000), uint64(7), uint8(2))
 	f.Fuzz(func(t *testing.T, ah, al, bh, bl, ch, cl uint64, mode uint8) {
-		checkArithmetic(t, rand128, RoundingMode(mode%5),
+		checkArithmetic(t, rand128, RoundingMode(mode%6),
 			New128FromBits(ah, al), New128FromBits(bh, bl), New128FromBits(ch, cl))
 	})
 }
