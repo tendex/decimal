@@ -631,3 +631,37 @@ func TestAwayFromZero(t *testing.T) {
 		t.Errorf("Int64From64 away from zero: %d, inexact %v", v, exact)
 	}
 }
+
+// TestUnmarshalTextAllocs pins the byte-slice paths at zero allocations: a
+// slice is parsed in place, however long, rather than through a string.
+func TestUnmarshalTextAllocs(t *testing.T) {
+	// The inputs are made outside the closures: a []byte of a constant longer
+	// than 32 bytes is itself an allocation.
+	short, amount := []byte("-1234.567"), []byte("-1234567890.123456")
+	long := []byte("-1234567890123456789012.345678901234E-6000")
+	// A decimal128 payload holds 33 digits at most.
+	payload64, payload128 := []byte("sNaN123456789012345"), []byte("-sNaN123456789012345678901234567890123")
+	// Boxed once, as a driver delivers it.
+	var src any = long
+	var s Decimal32
+	var d Decimal64
+	var q Decimal128
+	for _, c := range []struct {
+		name string
+		f    func()
+	}{
+		{"UnmarshalText32", func() { s.UnmarshalText(short) }},
+		{"UnmarshalText64", func() { d.UnmarshalText(amount) }},
+		{"UnmarshalText64 payload", func() { d.UnmarshalText(payload64) }},
+		{"UnmarshalText128", func() { q.UnmarshalText(long) }},
+		{"UnmarshalText128 payload", func() { q.UnmarshalText(payload128) }},
+		{"Scan128", func() { q.Scan(src) }},
+	} {
+		if n := testing.AllocsPerRun(100, c.f); n != 0 {
+			t.Errorf("%s allocates %v times", c.name, n)
+		}
+	}
+	if q.String() != "-1.234567890123456789012345678901234E-5979" || !d.IsNaN() {
+		t.Errorf("parsed %v, %v", q, d)
+	}
+}

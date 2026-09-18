@@ -103,10 +103,11 @@ func (x Decimal64) MarshalText() ([]byte, error) { return x.AppendText(nil) }
 // UnmarshalText implements encoding.TextUnmarshaler. It accepts the same
 // syntax as Parse64.
 func (x *Decimal64) UnmarshalText(b []byte) error {
-	v, err := Parse64(string(b))
+	var c Context
+	n, err := c.parseBytes(&format64, "Parse64", b)
 	if err != nil {
 		return err
 	}
-	*x = v
+	*x = pack64(n)
 	return nil
 }
