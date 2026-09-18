@@ -22,7 +22,8 @@ type scanned struct {
 // arithmetic far away from integer overflow.
 const maxScanExp = 1 << 28
 
-// scan converts s, in the syntax accepted by the Parse functions:
+// scan converts s, a string or a byte slice, in the syntax accepted by the
+// Parse functions:
 //
 //	[sign] digits [. digits] [e|E [sign] digits]
 //	[sign] . digits [e|E [sign] digits]
@@ -30,7 +31,7 @@ const maxScanExp = 1 << 28
 //	[sign] nan [digits] | snan [digits]
 //
 // Letters are matched without regard to case.
-func scan(s string) (r scanned, ok bool) {
+func scan[S string | []byte](s S) (r scanned, ok bool) {
 	i := 0
 	if i < len(s) && (s[i] == '+' || s[i] == '-') {
 		r.neg = s[i] == '-'
@@ -113,16 +114,18 @@ digits:
 	return r, true
 }
 
-// scanSpecial scans an infinity or NaN; the sign has been consumed.
-func scanSpecial(r scanned, s string) (scanned, bool) {
+// scanSpecial scans an infinity or NaN; the sign has been consumed. The
+// conversions to string are of a few bytes, which the compiler keeps on the
+// stack.
+func scanSpecial[S string | []byte](r scanned, s S) (scanned, bool) {
 	switch {
-	case strings.EqualFold(s, "inf"), strings.EqualFold(s, "infinity"):
+	case len(s) == 3 && strings.EqualFold(string(s), "inf"), len(s) == 8 && strings.EqualFold(string(s), "infinity"):
 		r.kind = infinite
 		return r, true
-	case len(s) >= 4 && strings.EqualFold(s[:4], "snan"):
+	case len(s) >= 4 && strings.EqualFold(string(s[:4]), "snan"):
 		r.kind = signalingNaN
 		s = s[4:]
-	case len(s) >= 3 && strings.EqualFold(s[:3], "nan"):
+	case len(s) >= 3 && strings.EqualFold(string(s[:3]), "nan"):
 		r.kind = quietNaN
 		s = s[3:]
 	default:
@@ -147,8 +150,15 @@ func scanSpecial(r scanned, s string) (scanned, bool) {
 }
 
 // parse converts s to format f, rounding if it has more digits than the
-// format holds.
-func (c *Context) parse(f *format, fn, s string) (num, error) {
+// format holds. parseBytes is the same for a byte slice, which the text
+// unmarshalers and sql.Scanner receive, without converting it to a string.
+func (c *Context) parse(f *format, fn, s string) (num, error) { return parseText(c, f, fn, s) }
+
+func (c *Context) parseBytes(f *format, fn string, b []byte) (num, error) {
+	return parseText(c, f, fn, b)
+}
+
+func parseText[S string | []byte](c *Context, f *format, fn string, s S) (num, error) {
 	r, ok := scan(s)
 	if ok && r.kind >= quietNaN && (r.coef.hi != 0 || r.coef.lo > f.maxPayload) {
 		ok = false
@@ -162,6 +172,6 @@ func (c *Context) parse(f *format, fn, s string) (num, error) {
 	return c.round(f, r.neg, r.coef, r.exp, r.sticky), nil
 }
 
-func syntaxError(fn, s string) error {
-	return &strconv.NumError{Func: "decimal." + fn, Num: strings.Clone(s), Err: strconv.ErrSyntax}
+func syntaxError[S string | []byte](fn string, s S) error {
+	return &strconv.NumError{Func: "decimal." + fn, Num: strings.Clone(string(s)), Err: strconv.ErrSyntax}
 }

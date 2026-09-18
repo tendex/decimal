@@ -27,7 +27,9 @@ func (x *Decimal32) Scan(src any) error {
 	case string:
 		v, err = Parse32(src)
 	case []byte:
-		v, err = Parse32(string(src))
+		var c Context
+		n, perr := c.parseBytes(&format32, "Parse32", src)
+		v, err = pack32(n), perr
 	case int64:
 		v = New32(src, 0)
 	case uint64:

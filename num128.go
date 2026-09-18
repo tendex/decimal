@@ -217,8 +217,12 @@ func trailingZeros128(x uint128, max int) (uint128, int) {
 	return x, n
 }
 
-// parse128 converts s to decimal128; see parse.
-func (c *Context) parse128(fn, s string) (num128, error) {
+// parse128 and parseBytes128 convert s to decimal128; see parse.
+func (c *Context) parse128(fn, s string) (num128, error) { return parseText128(c, fn, s) }
+
+func (c *Context) parseBytes128(fn string, b []byte) (num128, error) { return parseText128(c, fn, b) }
+
+func parseText128[S string | []byte](c *Context, fn string, s S) (num128, error) {
 	r, ok := scan(s)
 	if ok && r.kind >= quietNaN && maxPayload128.less(r.coef) {
 		ok = false
