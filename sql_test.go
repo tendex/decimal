@@ -63,6 +63,7 @@ func TestScan(t *testing.T) {
 		{1e300, "1E+300"},
 		{5e-324, "5E-324"},
 		{math.Inf(-1), "-Infinity"},
+		{math.Inf(1), "Infinity"},
 		{math.NaN(), "NaN"},
 	} {
 		var x Decimal64
