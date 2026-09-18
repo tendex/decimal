@@ -515,3 +515,119 @@ func TestMarshal(t *testing.T) {
 		t.Error("UnmarshalBinary accepted the wrong length")
 	}
 }
+
+func TestRoundToMultiple(t *testing.T) {
+	for _, tt := range []struct {
+		x, y  string
+		mode  RoundingMode
+		want  string
+		flags Flags
+	}{
+		{"10.12", "0.05", ToNearestEven, "10.10", Inexact},
+		{"10.14", "0.05", ToNearestEven, "10.15", Inexact},
+		{"10.15", "0.05", ToNearestEven, "10.15", 0},
+		{"10.1", "0.05", ToNearestEven, "10.10", 0}, // exact, with a digit added
+		{"10.125", "0.05", ToNearestEven, "10.10", Inexact},
+		{"10.175", "0.05", ToNearestEven, "10.20", Inexact},
+		{"10.125", "0.05", ToNearestAway, "10.15", Inexact},
+		{"10.12", "0.05", ToZero, "10.10", Inexact},
+		{"10.12", "0.05", ToPositiveInf, "10.15", Inexact},
+		{"10.12", "0.05", ToNegativeInf, "10.10", Inexact},
+		{"10.12", "0.05", AwayFromZero, "10.15", Inexact},
+		{"-10.12", "0.05", ToNearestEven, "-10.10", Inexact},
+		{"-10.12", "0.05", ToZero, "-10.10", Inexact},
+		{"-10.12", "0.05", ToPositiveInf, "-10.10", Inexact},
+		{"-10.12", "0.05", ToNegativeInf, "-10.15", Inexact},
+		{"-10.12", "0.05", AwayFromZero, "-10.15", Inexact},
+		{"10.12", "0.050", ToNearestEven, "10.100", Inexact}, // the exponent of y
+		{"7", "2.5", ToNearestEven, "7.5", Inexact},
+		{"6.25", "2.5", ToNearestEven, "5.0", Inexact},
+		{"6.25", "2.5", ToNearestAway, "7.5", Inexact},
+		{"1234.5", "25", ToNearestEven, "1225", Inexact},
+		{"1234.5", "1E+2", ToNearestEven, "1.2E+3", Inexact},
+		{"1234.5", "0.01", ToNearestEven, "1234.50", 0},
+		{"1234.567", "0.01", ToNearestEven, "1234.57", Inexact},
+		// Zeros and values below half an increment.
+		{"0", "0.05", ToNearestEven, "0.00", 0},
+		{"-0", "0.05", ToNearestEven, "-0.00", 0},
+		{"0E+5", "0.05", ToNearestEven, "0.00", 0},
+		{"0.001", "0.05", ToNearestEven, "0.00", Inexact},
+		{"-0.001", "0.05", ToNearestEven, "-0.00", Inexact},
+		{"0.001", "0.05", ToPositiveInf, "0.05", Inexact},
+		{"-0.001", "0.05", AwayFromZero, "-0.05", Inexact},
+		{"0.025", "0.05", ToNearestEven, "0.00", Inexact},
+		{"0.025", "0.05", ToNearestAway, "0.05", Inexact},
+		{"1E-20", "0.05", ToNearestEven, "0.00", Inexact},
+		{"1E-20", "0.05", AwayFromZero, "0.05", Inexact},
+		{"1E-300", "1E+300", ToNegativeInf, "0E+300", Inexact},
+		{"-1E-300", "1E+300", ToNegativeInf, "-1E+300", Inexact},
+		// The limits of the format.
+		{"1E+16", "3", ToNearestEven, "9999999999999999", Inexact},
+		{"1E+16", "7", ToNearestEven, "NaN", Invalid},
+		{"1E+16", "7", ToZero, "9999999999999996", Inexact},
+		{"9999999999999999", "0.05", ToNearestEven, "NaN", Invalid},
+		{"1E+20", "0.05", ToNearestEven, "NaN", Invalid},
+		{"9.999999999999999E+384", "1", ToNearestEven, "NaN", Invalid},
+		{"9.999999999999999E+384", "1E+369", ToNearestEven, "9.999999999999999E+384", 0},
+		// Invalid operands.
+		{"1", "0", ToNearestEven, "NaN", Invalid},
+		{"1", "-0.05", ToNearestEven, "NaN", Invalid},
+		{"1", "-0", ToNearestEven, "NaN", Invalid},
+		{"1", "Inf", ToNearestEven, "NaN", Invalid},
+		{"Inf", "0.05", ToNearestEven, "NaN", Invalid},
+		{"Inf", "Inf", ToNearestEven, "NaN", Invalid},
+		{"NaN", "0.05", ToNearestEven, "NaN", 0},
+		{"1", "NaN7", ToNearestEven, "NaN7", 0},
+		{"sNaN", "0.05", ToNearestEven, "NaN", Invalid},
+	} {
+		c := Context{Rounding: tt.mode}
+		got := c.RoundToMultiple64(MustParse64(tt.x), MustParse64(tt.y))
+		if got.String() != tt.want || c.Flags != tt.flags {
+			t.Errorf("RoundToMultiple64(%s, %s) %v = %s [%v], want %s [%v]", tt.x, tt.y, tt.mode, got, c.Flags, tt.want, tt.flags)
+		}
+	}
+	// A power of ten is Quantize.
+	for _, s := range []string{"1234.567", "-0.005", "0.015", "1E+20", "NaN3", "Inf"} {
+		x, y := MustParse64(s), MustParse64("0.01")
+		if a, b := x.RoundToMultiple(y), x.Quantize(y); a.CmpTotal(b) != 0 {
+			t.Errorf("RoundToMultiple(%s, 0.01) = %v, Quantize = %v", s, a, b)
+		}
+	}
+	if got := MustParse64("10.12").RoundToMultiple(MustParse64("0.05")).String(); got != "10.10" {
+		t.Errorf("RoundToMultiple: %s", got)
+	}
+	if got := MustParse32("10.12").RoundToMultiple(MustParse32("0.05")).String(); got != "10.10" {
+		t.Errorf("Decimal32 RoundToMultiple: %s", got)
+	}
+	c := Context{Rounding: ToNearestEven}
+	if got := c.RoundToMultiple128(MustParse128("1E+34"), MustParse128("3")).String(); got != "9999999999999999999999999999999999" || c.Flags != Inexact {
+		t.Errorf("Decimal128 RoundToMultiple: %s [%v]", got, c.Flags)
+	}
+	c = Context{Rounding: AwayFromZero}
+	if got := c.RoundToMultiple128(MustParse128("1E-6000"), MustParse128("2.5E+6000")).String(); got != "2.5E+6000" || c.Flags != Inexact {
+		t.Errorf("Decimal128 RoundToMultiple: %s [%v]", got, c.Flags)
+	}
+}
+
+func TestAwayFromZero(t *testing.T) {
+	c := Context{Rounding: AwayFromZero}
+	for _, tt := range []struct{ got, want string }{
+		{c.Round64(MustParse64("2.341"), 2).String(), "2.35"},
+		{c.Round64(MustParse64("-2.341"), 2).String(), "-2.35"},
+		{c.Round64(MustParse64("0.001"), 2).String(), "0.01"},
+		{c.Quo64(New64(1, 0), New64(3, 0)).String(), "0.3333333333333334"},
+		{c.Quo64(New64(-1, 0), New64(3, 0)).String(), "-0.3333333333333334"},
+		{c.Sqrt64(New64(2, 0)).String(), "1.414213562373096"},
+		{c.Mul64(MustParse64("9.999999999999999E+384"), New64(10, 0)).String(), "Infinity"},
+		{MustParse64("2.1").RoundToIntegral(AwayFromZero).String(), "3"},
+		{MustParse64("-2.1").RoundToIntegral(AwayFromZero).String(), "-3"},
+		{AwayFromZero.String(), "AwayFromZero"},
+	} {
+		if tt.got != tt.want {
+			t.Errorf("got %s, want %s", tt.got, tt.want)
+		}
+	}
+	if v, exact := c.Int64From64(MustParse64("2.1")), c.Flags&Inexact != 0; v != 3 || !exact {
+		t.Errorf("Int64From64 away from zero: %d, inexact %v", v, exact)
+	}
+}

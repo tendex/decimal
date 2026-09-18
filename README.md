@@ -40,6 +40,7 @@ z := decimal.New64FromFloat(0.5)        // from binary floating point
 x.Add(y); x.Sub(y); x.Mul(y); x.Quo(y)  // correctly rounded, ties to even
 x.FMA(y, z); x.Sqrt(); x.Remainder(y); x.Mod(y)
 x.Quantize(decimal.MustParse64("0.01")) // to a given exponent, padding
+x.RoundToMultiple(y)                    // to a multiple of y, such as a tick size
 x.Round(2)                              // to decimal places, never padding
 x.RoundToIntegral(decimal.ToZero)
 
@@ -76,6 +77,10 @@ if c.Flags&(decimal.Inexact|decimal.Overflow) != 0 {
 `<Destination>From<Width>`, as in `Int64From64`. A `Context` is two bytes of
 plain data; there is no global or per-goroutine state.
 
+A sixth direction, `AwayFromZero`, is the round-up of the General Decimal
+Arithmetic specification, which IEEE 754 lacks and which fees and margins
+often call for.
+
 ### Equality, and why `==` does not compile
 
 Decimal formats are redundant: `1`, `1.0` and `1.00` are distinct *members of
@@ -110,6 +115,10 @@ that forbids `==` fits in four bytes.)
 Not provided: alternate exception handling (traps), and the transcendental
 functions of clause 9, both of which the standard makes optional.
 
+Provided beyond the standard: `Round` to a number of decimal places, `Mod`,
+`RoundToMultiple` to a multiple of any increment, and the `AwayFromZero`
+rounding direction.
+
 Two behaviours are worth knowing because other implementations differ.
 `Sqrt` honours the rounding direction, as IEEE 754 requires; implementations
 of the General Decimal Arithmetic specification, such as decNumber and
@@ -120,10 +129,10 @@ standard leaves to the implementation.
 Conformance is tested four ways:
 
 1. **The General Decimal Arithmetic test cases** (`testdata/dectest`), Mike
-   Cowlishaw's suite for exactly these formats: about 24,700 cases across the
+   Cowlishaw's suite for exactly these formats: about 25,000 cases across the
    three formats run and pass. Cases are skipped only where they test
    something outside IEEE 754 (the logical and shift operations, `divideint`,
-   engineering notation, rounding modes IEEE 754 does not have) or something
+   engineering notation, the half_down and 05up rounding modes) or something
    specific to a DPD-in-memory implementation.
 2. **A reference implementation** on `math/big` (`ref_test.go`), against which
    add, subtract, multiply, divide, fused multiply-add and square root are

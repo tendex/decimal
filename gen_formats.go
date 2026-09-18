@@ -30,7 +30,7 @@ var sources = []string{
 // names are the identifiers that carry the format width as a suffix: the
 // exported API, then the helpers of the test adapters.
 const names = `Add|Sub|Mul|Quo|FMA|Sqrt|Compare|CompareSignal|Min|Max|MinNum|MaxNum|` +
-	`Quantize|Quantum|Round|RoundToIntegralExact|RoundToIntegral|NextUp|NextDown|LogB|ScaleB|` +
+	`Quantize|Quantum|Round|RoundToIntegralExact|RoundToIntegral|RoundToMultiple|NextUp|NextDown|LogB|ScaleB|` +
 	`Reduce|Remainder|Mod|Parse|MustParse|New|Inf|NaN|NewNaN|` +
 	`arg|args|unary|binary|compare|binaryNaN|minMax|apply|hex|hexArg|zeroLike|scaleArg|` +
 	`decOps|TestDecTest|` +

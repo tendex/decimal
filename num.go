@@ -176,6 +176,8 @@ func roundInc(mode RoundingMode, neg bool, lsb uint64, rem remainder) uint64 {
 		if neg {
 			return 1
 		}
+	case AwayFromZero:
+		return 1
 	}
 	return 0
 }

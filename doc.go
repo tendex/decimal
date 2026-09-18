@@ -54,6 +54,11 @@
 // as in Add64 and Sqrt128. Every method on a decimal type that can round or
 // raise an exception has a Context counterpart.
 //
+// Two things the standard lacks are provided as well: AwayFromZero, the
+// round-up of the General Decimal Arithmetic specification, as a sixth
+// rounding direction; and RoundToMultiple, which rounds to a multiple of any
+// increment, such as a tick size, where Quantize rounds to a power of ten.
+//
 // # Conformance
 //
 // The package implements all the operations IEEE 754-2019 requires of a

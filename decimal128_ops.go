@@ -47,6 +47,17 @@ func (c *Context) Quantize128(x, y Decimal128) Decimal128 {
 	return pack128(c.quantizeTo128(x.unpack(), y.unpack()))
 }
 
+// RoundToMultiple128 returns x rounded, in the direction of the context, to a
+// multiple of y, which must be finite and positive. The result has the
+// exponent of y, as Quantize128 gives it: 10.12 rounded to a multiple of 0.05
+// is 10.10, and to a multiple of 0.25 is 10.00. Quantize128 is the special
+// case of y a power of ten. It raises Inexact if the result differs from x,
+// and Invalid, returning a NaN, if x is infinite, if y is not a finite
+// positive number, or if the result would need more than 34 digits.
+func (c *Context) RoundToMultiple128(x, y Decimal128) Decimal128 {
+	return pack128(c.roundToMultiple128(x.unpack(), y.unpack()))
+}
+
 // Quantum128 returns the quantum of x, 1 × 10**exponent: the value of one
 // unit in the last place of its coefficient. The quantum of an infinity is
 // +Inf.
@@ -182,6 +193,14 @@ func (x Decimal128) Max(y Decimal128) Decimal128 {
 func (x Decimal128) Quantize(y Decimal128) Decimal128 {
 	var c Context
 	return c.Quantize128(x, y)
+}
+
+// RoundToMultiple returns x rounded, to nearest even, to a multiple of y,
+// such as a tick size or a coin: 10.12 to a multiple of 0.05 is 10.10. The
+// result has the exponent of y. See Context.RoundToMultiple128.
+func (x Decimal128) RoundToMultiple(y Decimal128) Decimal128 {
+	var c Context
+	return c.RoundToMultiple128(x, y)
 }
 
 // Quantum returns the quantum of x, 1 × 10**exponent; the quantum of 12.50

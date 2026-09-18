@@ -45,6 +45,17 @@ func (c *Context) Quantize64(x, y Decimal64) Decimal64 {
 	return pack64(c.quantizeTo(&format64, x.unpack(), y.unpack()))
 }
 
+// RoundToMultiple64 returns x rounded, in the direction of the context, to a
+// multiple of y, which must be finite and positive. The result has the
+// exponent of y, as Quantize64 gives it: 10.12 rounded to a multiple of 0.05
+// is 10.10, and to a multiple of 0.25 is 10.00. Quantize64 is the special
+// case of y a power of ten. It raises Inexact if the result differs from x,
+// and Invalid, returning a NaN, if x is infinite, if y is not a finite
+// positive number, or if the result would need more than 16 digits.
+func (c *Context) RoundToMultiple64(x, y Decimal64) Decimal64 {
+	return pack64(c.roundToMultiple(&format64, x.unpack(), y.unpack()))
+}
+
 // Quantum64 returns the quantum of x, 1 × 10**exponent: the value of one
 // unit in the last place of its coefficient. The quantum of an infinity is
 // +Inf.
@@ -180,6 +191,14 @@ func (x Decimal64) Max(y Decimal64) Decimal64 {
 func (x Decimal64) Quantize(y Decimal64) Decimal64 {
 	var c Context
 	return c.Quantize64(x, y)
+}
+
+// RoundToMultiple returns x rounded, to nearest even, to a multiple of y,
+// such as a tick size or a coin: 10.12 to a multiple of 0.05 is 10.10. The
+// result has the exponent of y. See Context.RoundToMultiple64.
+func (x Decimal64) RoundToMultiple(y Decimal64) Decimal64 {
+	var c Context
+	return c.RoundToMultiple64(x, y)
 }
 
 // Quantum returns the quantum of x, 1 × 10**exponent; the quantum of 12.50
