@@ -54,6 +54,9 @@ func (c *Context) Quantize128(x, y Decimal128) Decimal128 {
 // case of y a power of ten. It raises Inexact if the result differs from x,
 // and Invalid, returning a NaN, if x is infinite, if y is not a finite
 // positive number, or if the result would need more than 34 digits.
+//
+// The result divided by y is the number of multiples, an integer that Quo128
+// returns exactly; in ToZero that is the integer quotient of x / y.
 func (c *Context) RoundToMultiple128(x, y Decimal128) Decimal128 {
 	return pack128(c.roundToMultiple128(x.unpack(), y.unpack()))
 }

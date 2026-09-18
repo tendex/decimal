@@ -54,6 +54,9 @@ func (c *Context) Quantize32(x, y Decimal32) Decimal32 {
 // case of y a power of ten. It raises Inexact if the result differs from x,
 // and Invalid, returning a NaN, if x is infinite, if y is not a finite
 // positive number, or if the result would need more than 7 digits.
+//
+// The result divided by y is the number of multiples, an integer that Quo32
+// returns exactly; in ToZero that is the integer quotient of x / y.
 func (c *Context) RoundToMultiple32(x, y Decimal32) Decimal32 {
 	return pack32(c.roundToMultiple(&format32, x.unpack(), y.unpack()))
 }

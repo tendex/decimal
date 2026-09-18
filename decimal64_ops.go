@@ -52,6 +52,9 @@ func (c *Context) Quantize64(x, y Decimal64) Decimal64 {
 // case of y a power of ten. It raises Inexact if the result differs from x,
 // and Invalid, returning a NaN, if x is infinite, if y is not a finite
 // positive number, or if the result would need more than 16 digits.
+//
+// The result divided by y is the number of multiples, an integer that Quo64
+// returns exactly; in ToZero that is the integer quotient of x / y.
 func (c *Context) RoundToMultiple64(x, y Decimal64) Decimal64 {
 	return pack64(c.roundToMultiple(&format64, x.unpack(), y.unpack()))
 }

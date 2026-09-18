@@ -36,7 +36,7 @@ func runRandom[T any](t *testing.T, rf randFormat[T], n int) {
 			// A tick size near the exponent of x, for rounding to a multiple.
 			ry.neg = false
 			ry.coef.SetInt64([...]int64{1, 2, 5, 25, 125, 3, 7, 10, 500}[r.IntN(9)])
-			ry.exp = rx.exp + 1 - r.IntN(f.prec+3)
+			ry.exp = max(rx.exp+1-r.IntN(f.prec+3), f.emin)
 		}
 		checkArithmetic(t, rf, mode, rf.fromRef(rx), rf.fromRef(ry), rf.fromRef(rz))
 	}
