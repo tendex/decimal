@@ -1,6 +1,7 @@
 package decimal_test
 
 import (
+	"database/sql"
 	"fmt"
 	"slices"
 
@@ -184,4 +185,27 @@ func ExampleDecimal64_DPD() {
 	// Output:
 	// BID 0xb1800000000002ee
 	// DPD 0xa2300000000003d0
+}
+
+func ExampleDecimal64_Scan() {
+	// Drivers deliver DECIMAL and NUMERIC columns as text, with the scale
+	// of the column, and NULL as nil.
+	var price decimal.Decimal64
+	fmt.Println(price.Scan([]byte("19.90")), price)
+	fmt.Println(price.Scan(nil))
+
+	// sql.Null accepts the NULL.
+	var discount sql.Null[decimal.Decimal64]
+	fmt.Println(discount.Scan(nil), discount.Valid)
+	fmt.Println(discount.Scan("0.250"), discount.Valid, discount.V)
+
+	// Value is plain notation, whatever the exponent.
+	v, _ := decimal.MustParse64("1.25E+3").Value()
+	fmt.Printf("%q\n", v)
+	// Output:
+	// <nil> 19.90
+	// decimal: cannot scan NULL into a Decimal64; use sql.Null[Decimal64]
+	// <nil> false
+	// <nil> true 0.250
+	// "1250"
 }
