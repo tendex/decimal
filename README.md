@@ -50,6 +50,7 @@ x.String()                              // "1.50"; round-trips exactly
 fmt.Sprintf("%.3f|%8.2f|%e", x, x, x)   // fmt verbs, width, precision, flags
 x.Int64(); x.Float64(); x.Decimal128()  // conversions
 x.Bits(); x.DPD()                       // interchange encodings
+x.Value(); x.Scan(v)                    // database/sql; sql.Null[Decimal64] for NULL
 ```
 
 The zero value of each type is the number 0, so values can be declared and

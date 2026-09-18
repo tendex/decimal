@@ -22,6 +22,7 @@ var sources = []string{
 	"decimal64_ops.go",
 	"decimal64_text.go",
 	"decimal64_conv.go",
+	"decimal64_sql.go",
 	"dectest64_test.go",
 	"bench64_test.go",
 }
