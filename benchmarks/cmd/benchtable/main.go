@@ -203,6 +203,7 @@ var operations = []struct{ name, label string }{
 	{"Sqrt", "`Sqrt`"},
 	{"Remainder", "`Remainder`"},
 	{"Quantize", "`Quantize` to 0.01"},
+	{"RoundToMultiple", "`RoundToMultiple` to 0.05"},
 	{"Round", "`Round(2)`"},
 	{"Cmp", "`Cmp`"},
 	{"Parse", "`Parse`"},

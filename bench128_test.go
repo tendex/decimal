@@ -16,13 +16,13 @@ func operands128(full bool) (xs [benchN]Decimal128) {
 // TestBenchOperands128 checks that every benchmarked operation succeeds on the
 // benchmark operands, so that no benchmark measures an error path.
 func TestBenchOperands128(t *testing.T) {
-	cent := MustParse128("0.01")
+	cent, tick := MustParse128("0.01"), MustParse128("0.05")
 	for _, xs := range [...][benchN]Decimal128{operands128(false), operands128(true)} {
 		for i := range xs {
 			x, y, z := xs[i], xs[(i+1)%benchN], xs[(i+2)%benchN]
 			for _, r := range []Decimal128{
 				x.Add(y), x.Sub(y), x.Mul(y), x.Quo(y), x.FMA(y, z), x.Abs().Sqrt(),
-				x.Remainder(y), x.Quantize(cent), x.Round(2), New128FromFloat(x.Float64()),
+				x.Remainder(y), x.Quantize(cent), x.RoundToMultiple(tick), x.Round(2), New128FromFloat(x.Float64()),
 			} {
 				if !r.IsFinite() {
 					t.Fatalf("operation on %v, %v, %v gives %v", x, y, z, r)
@@ -41,7 +41,7 @@ func BenchmarkDecimal128(b *testing.B) {
 		b.Run(op+"/Short", func(b *testing.B) { f(b, &short) })
 		b.Run(op+"/Full", func(b *testing.B) { f(b, &full) })
 	}
-	cent := MustParse128("0.01")
+	cent, tick := MustParse128("0.01"), MustParse128("0.05")
 
 	each("Add", func(b *testing.B, xs *[benchN]Decimal128) {
 		for i := 0; i < b.N; i++ {
@@ -81,6 +81,11 @@ func BenchmarkDecimal128(b *testing.B) {
 	each("Quantize", func(b *testing.B, xs *[benchN]Decimal128) {
 		for i := 0; i < b.N; i++ {
 			sink128 = xs[i%benchN].Quantize(cent)
+		}
+	})
+	each("RoundToMultiple", func(b *testing.B, xs *[benchN]Decimal128) {
+		for i := 0; i < b.N; i++ {
+			sink128 = xs[i%benchN].RoundToMultiple(tick)
 		}
 	})
 	each("Round", func(b *testing.B, xs *[benchN]Decimal128) {
