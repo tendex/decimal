@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"reflect"
 	"slices"
@@ -454,9 +455,27 @@ func TestRound(t *testing.T) {
 		{"0.004", 2, "0.00"},
 		{"Inf", 2, "Infinity"},
 		{"NaN", 2, "NaN"},
+		{"123.45", math.MaxInt, "123.45"},
+		{"123.45", -369, "0E+369"},
+		{"123.45", -370, "NaN"}, // beyond the exponent range
+		{"123.45", math.MinInt, "NaN"},
 	} {
 		if got := MustParse64(tt.in).Round(tt.places).String(); got != tt.want {
 			t.Errorf("(%s).Round(%d) = %s, want %s", tt.in, tt.places, got, tt.want)
+		}
+	}
+	for _, places := range []int{-6112, math.MinInt + 1, math.MinInt} { // beyond every format's emax
+		var c Context
+		if got := c.Round64(MustParse64("123.45"), places); !got.IsNaN() || c.Flags != Invalid {
+			t.Errorf("Round64(123.45, %d) = %s [%v], want NaN [Invalid]", places, got, c.Flags)
+		}
+		var c32 Context
+		if got := c32.Round32(MustParse32("123.45"), places); !got.IsNaN() || c32.Flags != Invalid {
+			t.Errorf("Round32(123.45, %d) = %s [%v], want NaN [Invalid]", places, got, c32.Flags)
+		}
+		var c128 Context
+		if got := c128.Round128(MustParse128("123.45"), places); !got.IsNaN() || c128.Flags != Invalid {
+			t.Errorf("Round128(123.45, %d) = %s [%v], want NaN [Invalid]", places, got, c128.Flags)
 		}
 	}
 	c := Context{Rounding: ToNearestAway}

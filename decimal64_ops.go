@@ -74,10 +74,12 @@ func (c *Context) Round64(x Decimal64, places int) Decimal64 {
 	switch {
 	case n.isNaN():
 		return pack64(c.nan(&format64, n, n))
-	case n.kind == infinite || int(n.exp) >= -places:
+	case n.kind == infinite || places >= -int(n.exp):
 		return x
 	}
-	return pack64(c.quantize(&format64, n, max(-places, format64.emin)))
+	// Clamp places before negating it: -math.MinInt overflows, and any
+	// exponent above emax raises Invalid in quantize regardless.
+	return pack64(c.quantize(&format64, n, -max(places, -format64.emax-1)))
 }
 
 // RoundToIntegralExact64 rounds x to an integer in the rounding direction of
