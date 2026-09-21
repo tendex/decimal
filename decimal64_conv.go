@@ -40,10 +40,14 @@ func (c *Context) New64FromUint(coef uint64, exp int) Decimal64 {
 }
 
 // New64FromFloat returns f converted to a Decimal64, correctly rounded
-// according to the context. A NaN converts to a quiet NaN.
+// according to the context. A NaN converts to a quiet NaN of the same sign;
+// a signaling NaN also raises Invalid.
 func (c *Context) New64FromFloat(f float64) Decimal64 {
 	switch {
 	case math.IsNaN(f):
+		if math.Float64bits(f)&(1<<51) == 0 { // the quiet bit is clear
+			c.Flags |= Invalid
+		}
 		return pack64(num{kind: quietNaN, neg: math.Signbit(f)})
 	case math.IsInf(f, 0):
 		return pack64(num{kind: infinite, neg: f < 0})

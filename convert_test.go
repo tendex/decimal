@@ -1,6 +1,7 @@
 package decimal
 
 import (
+	"fmt"
 	"math"
 	"math/big"
 	"math/rand/v2"
@@ -235,6 +236,27 @@ func TestToFloat(t *testing.T) {
 	var c Context
 	if c.Float64From64(MustParse64("sNaN")); c.Flags != Invalid {
 		t.Errorf("sNaN raised %v", c.Flags)
+	}
+	sNaN := math.Float64frombits(0x7FF0000000000001) // quiet bit clear
+	for _, tt := range []struct {
+		f    float64
+		want string
+		flag Flags
+	}{
+		{math.NaN(), "NaN", 0},
+		{math.Copysign(math.NaN(), -1), "-NaN", 0},
+		{sNaN, "NaN", Invalid},
+		{math.Copysign(sNaN, -1), "-NaN", Invalid},
+	} {
+		var c32, c64, c128 Context
+		for _, got := range []fmt.Stringer{c32.New32FromFloat(tt.f), c64.New64FromFloat(tt.f), c128.New128FromFloat(tt.f)} {
+			if got.String() != tt.want {
+				t.Errorf("NaN %#x converts to %s, want %s", math.Float64bits(tt.f), got, tt.want)
+			}
+		}
+		if c32.Flags != tt.flag || c64.Flags != tt.flag || c128.Flags != tt.flag {
+			t.Errorf("NaN %#x raised %v, %v, %v; want %v", math.Float64bits(tt.f), c32.Flags, c64.Flags, c128.Flags, tt.flag)
+		}
 	}
 	r := rand.New(rand.NewPCG(11, 12))
 	for i := 0; i < 100000; i++ {
