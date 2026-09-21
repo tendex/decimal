@@ -87,9 +87,19 @@ Decimal formats are redundant: `1`, `1.0` and `1.00` are distinct *members of
 one cohort*, equal in value but with different exponents, and arithmetic
 preserves those exponents (`1.20 + 1.1` is `2.30`). A bitwise `==` would say
 they differ, so `Decimal64` and `Decimal128` are deliberately not comparable
-and cannot be used as map keys directly. Use `Equal`/`Cmp` to compare values,
-and `x.Reduce().Bits()` as a map key. (`Decimal32` is the exception: nothing
-that forbids `==` fits in four bytes.)
+and cannot be used as map keys directly. (`Decimal32` is the exception:
+nothing that forbids `==` fits in four bytes.) Use `Equal`/`Cmp` to compare
+values. For a map key by value, reduce first, and also give zeros one sign:
+`+0` and `-0` are equal, but `Reduce` keeps the sign, so their bits differ.
+
+```go
+func key(x decimal.Decimal64) uint64 {
+	if x.IsZero() {
+		x = decimal.Decimal64{} // -0 and +0 are equal; make them one key
+	}
+	return x.Reduce().Bits()
+}
+```
 
 ## Conformance
 
