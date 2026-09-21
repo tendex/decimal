@@ -203,6 +203,17 @@ func TestText(t *testing.T) {
 		{"1234.5678", 'g', 3, "1.23e+03"},
 		{"1234.5678", 'g', 6, "1234.57"},
 		{"1.50", 'g', -1, "1.50"},
+		{"1.50", 'g', 3, "1.5"}, // a precision drops trailing zeros, as strconv does
+		{"1.50", 'g', 0, "2"},
+		{"1.00", 'g', 3, "1"},
+		{"100", 'g', 3, "100"},
+		{"1000", 'g', 3, "1e+03"},
+		{"100.5", 'g', 3, "100"},
+		{"999.9", 'g', 3, "1e+03"},
+		{"0", 'g', 3, "0"},
+		{"0.00", 'g', 3, "0"},
+		{"0E+5", 'g', 3, "0"},
+		{"0.00", 'g', -1, "0.00"},
 		{"1E+25", 'g', -1, "1e+25"},
 		{"1E+20", 'g', -1, "100000000000000000000"},
 		{"0.00001", 'g', -1, "1e-05"},
@@ -247,6 +258,30 @@ func TestFormat(t *testing.T) {
 	} {
 		if got := fmt.Sprintf(tt.format, tt.v); got != tt.want {
 			t.Errorf("Sprintf(%q) = %q, want %q", tt.format, got, tt.want)
+		}
+	}
+}
+
+// TestFormatStrconv checks the explicit-precision formats against strconv on
+// values that float64 and Decimal64 both represent exactly, so that the two
+// round the same digits.
+func TestFormatStrconv(t *testing.T) {
+	var vals []float64
+	for _, v := range []float64{0, 1, 5, 9, 100, 999, 1000, 1024, 12345, 100000, 1234567, 1 << 53, 1e20, 1e22} {
+		vals = append(vals, v, -v)
+	}
+	for f := 1.0; f >= 0x1p-10; f /= 2 { // dyadic fractions with short expansions
+		vals = append(vals, f, 1+f, 100+f, 999+f, 0x1p40*f)
+	}
+	for _, f := range vals {
+		x := New64FromFloat(f)
+		for _, verb := range "efg" {
+			for prec := 0; prec <= 12; prec++ {
+				format := fmt.Sprintf("%%.%d%c", prec, verb)
+				if got, want := fmt.Sprintf(format, x), fmt.Sprintf(format, f); got != want {
+					t.Errorf("Sprintf(%q, %v) = %q, want %q", format, x, got, want)
+				}
+			}
 		}
 	}
 }
