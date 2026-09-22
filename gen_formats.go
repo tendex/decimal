@@ -47,7 +47,7 @@ func rules(width, digits, testPrefix string, wide bool) []rule {
 	if wide {
 		// The 128-bit kernel is a separate set of functions with a fixed
 		// format and uint128 coefficients.
-		add(`format64\.emin`, `emin128`)
+		add(`format64\.(emin|emax)`, `${1}128`)
 		add(`\b(\w+)\.(\w+)\(&format64, `, `${1}.${2}128(`)
 		add(`\(&format64\)`, `()`)
 		add(`\bc\.invalid\(\)`, `c.invalid128()`)

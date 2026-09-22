@@ -76,10 +76,12 @@ func (c *Context) Round32(x Decimal32, places int) Decimal32 {
 	switch {
 	case n.isNaN():
 		return pack32(c.nan(&format32, n, n))
-	case n.kind == infinite || int(n.exp) >= -places:
+	case n.kind == infinite || places >= -int(n.exp):
 		return x
 	}
-	return pack32(c.quantize(&format32, n, max(-places, format32.emin)))
+	// Clamp places before negating it: -math.MinInt overflows, and any
+	// exponent above emax raises Invalid in quantize regardless.
+	return pack32(c.quantize(&format32, n, -max(places, -format32.emax-1)))
 }
 
 // RoundToIntegralExact32 rounds x to an integer in the rounding direction of

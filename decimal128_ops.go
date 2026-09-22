@@ -76,10 +76,12 @@ func (c *Context) Round128(x Decimal128, places int) Decimal128 {
 	switch {
 	case n.isNaN():
 		return pack128(c.nan128(n, n))
-	case n.kind == infinite || int(n.exp) >= -places:
+	case n.kind == infinite || places >= -int(n.exp):
 		return x
 	}
-	return pack128(c.quantize128(n, max(-places, emin128)))
+	// Clamp places before negating it: -math.MinInt overflows, and any
+	// exponent above emax raises Invalid in quantize regardless.
+	return pack128(c.quantize128(n, -max(places, -emax128-1)))
 }
 
 // RoundToIntegralExact128 rounds x to an integer in the rounding direction of
