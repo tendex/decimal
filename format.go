@@ -136,6 +136,13 @@ func (t *text) round(n int) {
 	t.dp++
 }
 
+// trim drops the trailing zeros of the digits.
+func (t *text) trim() {
+	for t.nd > 0 && t.buf[t.off+t.nd-1] == '0' {
+		t.nd--
+	}
+}
+
 func allZero(d []byte) bool {
 	for _, c := range d {
 		if c != '0' {
@@ -178,26 +185,28 @@ func (t *text) append(b []byte, format byte, prec int) []byte {
 		t.round(t.dp + prec)
 		return t.appendF(b, prec)
 	case 'g', 'G':
+		if !exact {
+			if prec == 0 {
+				prec = 1
+			}
+			// As strconv: round to prec significant digits and drop the
+			// trailing zeros, so that %.3g prints 1.00 as "1" and 1000 as
+			// "1e+03".
+			t.round(prec)
+			t.trim()
+		}
+		if t.nd == 0 {
+			t.dp = 0 // a zero of any exponent prints as "0"
+		}
 		eprec := prec
 		if exact {
-			eprec = 21
-			prec = t.nd
-		} else {
-			if prec == 0 {
-				prec, eprec = 1, 1
-			}
-			t.round(prec)
-			if eprec > t.nd && t.nd >= t.dp {
-				eprec = t.nd
-			}
+			eprec, prec = 21, t.nd
+		} else if eprec > t.nd && t.nd >= t.dp {
+			eprec = t.nd
 		}
 		// %e is used if the exponent is less than -4 or not less than the
 		// precision, as in strconv.
-		x := t.dp - 1
-		if t.nd == 0 {
-			x = 0
-		}
-		if x < -4 || x >= eprec {
+		if x := t.dp - 1; x < -4 || x >= eprec {
 			return t.appendE(b, format+'e'-'g', max(min(prec, t.nd)-1, 0))
 		}
 		if exact {

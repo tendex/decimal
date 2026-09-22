@@ -66,8 +66,9 @@ func (x Decimal64) String() string {
 // (-d.dddde±dd), 'f' or 'F' (-ddd.ddd), or 'g' or 'G' ('e' for large
 // exponents, 'f' otherwise). The precision prec is the number of digits
 // after the decimal point for 'e' and 'f' and the number of significant
-// digits for 'g'; rounding to it is to nearest even. A negative precision
-// formats x exactly, trailing zeros included.
+// digits for 'g', which like strconv then omits trailing zeros; rounding to
+// it is to nearest even. A negative precision formats x exactly, trailing
+// zeros included.
 func (x Decimal64) Text(format byte, prec int) string {
 	var buf [64]byte
 	return string(x.Append(buf[:0], format, prec))
