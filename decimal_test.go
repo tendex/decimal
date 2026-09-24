@@ -196,6 +196,12 @@ func TestText(t *testing.T) {
 		{"1234.5678", 'E', 0, "1E+03"},
 		{"1.50", 'e', -1, "1.50e+00"},
 		{"0", 'e', -1, "0e+00"},
+		{"0.00", 'e', -1, "0e-02"}, // an exact zero keeps its exponent, as String does
+		{"-0E+5", 'e', -1, "-0e+05"},
+		{"0E-398", 'E', -1, "0E-398"},
+		{"0E+5", 'f', -1, "0"},
+		{"0.00", 'f', -1, "0.00"},
+		{"0E-398", 'e', 3, "0.000e+00"},
 		{"0", 'e', 2, "0.00e+00"},
 		{"1E-7", 'e', -1, "1e-07"},
 		{"9.99E+384", 'e', 1, "1.0e+385"},
@@ -215,6 +221,12 @@ func TestText(t *testing.T) {
 		{"0.00", 'g', 3, "0"},
 		{"0E+5", 'g', 3, "0"},
 		{"0.00", 'g', -1, "0.00"},
+		{"-0.0000", 'g', -1, "-0.0000"},
+		{"0E-5", 'g', -1, "0e-05"}, // a zero switches to %e where 1E-5 does
+		{"-0E-398", 'g', -1, "-0e-398"},
+		{"0E+5", 'g', -1, "0"},
+		{"0E+21", 'g', -1, "0e+21"}, // where 1E+21 is 1e+21
+		{"0E-398", 'g', 3, "0"},
 		{"1E+25", 'g', -1, "1e+25"},
 		{"1E+20", 'g', -1, "100000000000000000000"},
 		{"0.00001", 'g', -1, "1e-05"},
@@ -226,6 +238,12 @@ func TestText(t *testing.T) {
 		if got := MustParse64(tt.in).Text(tt.format, tt.prec); got != tt.want {
 			t.Errorf("(%s).Text(%q, %d) = %s, want %s", tt.in, tt.format, tt.prec, got, tt.want)
 		}
+	}
+	if got := MustParse128("0E-6176").Text('g', -1); got != "0e-6176" {
+		t.Errorf("(0E-6176).Text('g', -1) = %.40s..., want 0e-6176", got)
+	}
+	if got := fmt.Sprintf("%g", MustParse32("-0E-101")); got != "-0e-101" {
+		t.Errorf("Sprintf(%%g, -0E-101) = %.40s..., want -0e-101", got)
 	}
 }
 
