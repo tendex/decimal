@@ -289,7 +289,9 @@ func (t *text) format(s fmt.State, verb rune, typ string) {
 	switch {
 	case neg:
 		sign = "-"
-	case s.Flag('+'):
+	case s.Flag('+') && verb != 'v':
+		// fmt reports %+v as the '+' flag, but it asks for field names,
+		// not a sign: float64 prints %+v of 1.5 as "1.5".
 		sign = "+"
 	case s.Flag(' '):
 		sign = " "
