@@ -538,6 +538,31 @@ func TestRound(t *testing.T) {
 			t.Errorf("Round128(123.45, %d) = %s [%v], want NaN [Invalid]", places, got, c128.Flags)
 		}
 	}
+	// A Round with nothing to round still returns a canonical encoding.
+	for _, x := range []Decimal64{
+		New64FromBits(inf64 | 1),                            // +Inf with stray trailing bits
+		New64FromBits(special64 | bias64<<51 | (1<<51 - 1)), // non-canonical 0E+0
+	} {
+		if got := x.Round(2); !got.IsCanonical() || got.String() != x.String() {
+			t.Errorf("(%#x).Round(2) = %#x, want %s, canonical", x.Bits(), got.Bits(), x)
+		}
+	}
+	for _, x := range []Decimal32{
+		New32FromBits(inf32 | 1),
+		New32FromBits(special32 | bias32<<21 | (1<<21 - 1)),
+	} {
+		if got := x.Round(2); !got.IsCanonical() || got.String() != x.String() {
+			t.Errorf("(%#x).Round(2) = %#x, want %s, canonical", x.Bits(), got.Bits(), x)
+		}
+	}
+	for _, x := range []Decimal128{
+		New128FromBits(inf128, 1),
+		New128FromBits(special128|bias128<<47, 0), // large-coefficient form: always 0
+	} {
+		if got := x.Round(2); !got.IsCanonical() || got.String() != x.String() {
+			t.Errorf("(%v).Round(2) = %v, not canonical", x, got)
+		}
+	}
 	c := Context{Rounding: ToNearestAway}
 	if got := c.Round64(MustParse64("1.225"), 2).String(); got != "1.23" || c.Flags != Inexact {
 		t.Errorf("half-up round: %s [%v]", got, c.Flags)

@@ -77,7 +77,7 @@ func (c *Context) Round32(x Decimal32, places int) Decimal32 {
 	case n.isNaN():
 		return pack32(c.nan(&format32, n, n))
 	case n.kind == infinite || places >= -int(n.exp):
-		return x
+		return pack32(n) // canonical, as every result is
 	}
 	// Clamp places before negating it: -math.MinInt overflows, and any
 	// exponent above emax raises Invalid in quantize regardless.

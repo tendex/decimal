@@ -77,7 +77,7 @@ func (c *Context) Round128(x Decimal128, places int) Decimal128 {
 	case n.isNaN():
 		return pack128(c.nan128(n, n))
 	case n.kind == infinite || places >= -int(n.exp):
-		return x
+		return pack128(n) // canonical, as every result is
 	}
 	// Clamp places before negating it: -math.MinInt overflows, and any
 	// exponent above emax raises Invalid in quantize regardless.
