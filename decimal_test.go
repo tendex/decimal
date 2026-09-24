@@ -603,6 +603,37 @@ func TestMarshal(t *testing.T) {
 		t.Error("json: bad number accepted")
 	}
 
+	// JSON numbers, as other encoders write decimals, keep their exponent
+	// and round as Parse does; escaped strings and null work as for a string.
+	var nums doc
+	data = []byte(`{"price": 19.990, "qty": -1.2345678e-3, "big": 12345678901234567890123456789012345}`)
+	if err := json.Unmarshal(data, &nums); err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(nums.Price, " ", nums.Qty, " ", nums.Big); got != "19.990 -0.001234568 1.234567890123456789012345678901234E+34" {
+		t.Errorf("json numbers: %s", got)
+	}
+	if err := json.Unmarshal([]byte(`{"price":"\u0031.50","qty":null}`), &nums); err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(nums.Price, " ", nums.Qty); got != "1.50 -0.001234568" {
+		t.Errorf("json escape and null: %s", got)
+	}
+	var arr []Decimal64
+	if err := json.Unmarshal([]byte(` [ 1 , "2.0", -3E+2, 0.0 ] `), &arr); err != nil || fmt.Sprint(arr) != "[1 2.0 -3E+2 0.0]" {
+		t.Errorf("json array: %v %v", arr, err)
+	}
+	for _, bad := range []string{`true`, `{}`, `[1]`, `""`, `"1 "`, `"\/1"`} {
+		var d Decimal64
+		if err := json.Unmarshal([]byte(bad), &d); err == nil {
+			t.Errorf("json: %s accepted as %v", bad, d)
+		}
+	}
+	var d Decimal64
+	if err := d.UnmarshalJSON([]byte(`true`)); err == nil || err.Error() != "decimal: cannot unmarshal a JSON boolean into a Decimal64" {
+		t.Errorf("UnmarshalJSON(true): %v", err)
+	}
+
 	b64, _ := in.Price.MarshalBinary()
 	b32, _ := in.Qty.MarshalBinary()
 	b128, _ := in.Big.MarshalBinary()
