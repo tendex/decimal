@@ -165,7 +165,10 @@ func fromFloat(f float64) (neg bool, coef uint128, exp int, sticky bool) {
 	}
 	// Keep 38 digits; the rest only matter as a sticky bit. The digit
 	// count estimated from the bit length may be one too large, which
-	// merely keeps 37 digits.
+	// merely keeps 37 digits, or, since 1233/4096 is just below log10(2),
+	// one too small, which keeps 39. It is too small only when 2**BitLen
+	// is just above a power of ten, so the 39 digits stay below 1.03e38
+	// and within the 128 bits of w.
 	if drop := n.BitLen()*1233>>12 + 1 - 38; drop > 0 {
 		rem := new(big.Int)
 		n.QuoRem(n, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(drop)), nil), rem)
