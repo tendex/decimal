@@ -12,8 +12,9 @@ import "fmt"
 // so "1.50" and "1.5" parse to different members of the same cohort.
 //
 // If s is not syntactically well-formed, Parse64 returns a quiet NaN and an
-// error of type *strconv.NumError wrapping strconv.ErrSyntax. Overflow and
-// underflow are not errors; use Context.Parse64 to observe them.
+// error that wraps a *strconv.NumError, which wraps strconv.ErrSyntax; use
+// errors.As and errors.Is to examine it. Overflow and underflow are not
+// errors; use Context.Parse64 to observe them.
 func Parse64(s string) (Decimal64, error) {
 	var c Context
 	return c.Parse64(s)

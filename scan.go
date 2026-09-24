@@ -173,5 +173,18 @@ func parseText[S string | []byte](c *Context, f *format, fn string, s S) (num, e
 }
 
 func syntaxError[S string | []byte](fn string, s S) error {
-	return &strconv.NumError{Func: "decimal." + fn, Num: strings.Clone(string(s)), Err: strconv.ErrSyntax}
+	return &parseError{strconv.NumError{Func: "decimal." + fn, Num: strings.Clone(string(s)), Err: strconv.ErrSyntax}}
 }
+
+// A parseError is a *strconv.NumError with the message of the decimal
+// function that failed. NumError's own Error method prefixes "strconv." to
+// Func, which would make it "strconv.decimal.Parse64".
+type parseError struct{ num strconv.NumError }
+
+func (e *parseError) Error() string {
+	return e.num.Func + ": parsing " + strconv.Quote(e.num.Num) + ": " + e.num.Err.Error()
+}
+
+// Unwrap returns the *strconv.NumError, for errors.As, and through it
+// strconv.ErrSyntax, for errors.Is.
+func (e *parseError) Unwrap() error { return &e.num }

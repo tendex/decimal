@@ -132,6 +132,9 @@ func TestParseErrors(t *testing.T) {
 		if !errors.As(err, &ne) || !errors.Is(err, strconv.ErrSyntax) || ne.Num != in || ne.Func != "decimal.Parse64" {
 			t.Errorf("Parse64(%q): unexpected error %#v", in, err)
 		}
+		if want := "decimal.Parse64: parsing " + strconv.Quote(in) + ": invalid syntax"; err.Error() != want {
+			t.Errorf("Parse64(%q): error %q, want %q", in, err, want)
+		}
 		if !x.IsNaN() {
 			t.Errorf("Parse64(%q) returned %v with its error, want NaN", in, x)
 		}
