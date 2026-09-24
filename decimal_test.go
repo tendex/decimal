@@ -256,6 +256,13 @@ func TestFormat(t *testing.T) {
 		{"%v", MustParse32("1.5"), "1.5"},
 		{"%.1f", MustParse128("0.25"), "0.2"},
 		{"%v", []Decimal64{New64(15, -1), New64(2, 0)}, "[1.5 2]"},
+		{"%+v", x.Neg(), "1234.5678"}, // %+v asks for field names, as for float64
+		{"%+v", x, "-1234.5678"},
+		{"%+v", []Decimal64{New64(15, -1)}, "[1.5]"},
+		{"%+v", struct{ D Decimal128 }{New128(15, -1)}, "{D:1.5}"},
+		{"%+v", MustParse32("1.5"), "1.5"},
+		{"%+s", x.Neg(), "+1234.5678"},
+		{"% v", x.Neg(), " 1234.5678"},
 	} {
 		if got := fmt.Sprintf(tt.format, tt.v); got != tt.want {
 			t.Errorf("Sprintf(%q) = %q, want %q", tt.format, got, tt.want)
