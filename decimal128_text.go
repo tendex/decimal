@@ -115,3 +115,17 @@ func (x *Decimal128) UnmarshalText(b []byte) error {
 	*x = pack128(n)
 	return nil
 }
+
+// UnmarshalJSON implements json.Unmarshaler. It accepts a JSON string in
+// the syntax of Parse128, which is what MarshalText gives encoding/json to
+// write, and also a JSON number, as other encoders write decimals: both
+// {"price":"19.990"} and {"price":19.990} unmarshal to 19.990, exponent
+// and all, and a number with more than 34 digits rounds to nearest even.
+// JSON null leaves x unchanged, as encoding/json expects.
+func (x *Decimal128) UnmarshalJSON(b []byte) error {
+	s, err := jsonText(b, "Decimal128")
+	if err != nil || s == nil {
+		return err
+	}
+	return x.UnmarshalText(s)
+}

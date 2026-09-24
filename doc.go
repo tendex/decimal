@@ -85,7 +85,8 @@
 // the FromDPD constructors. The text form produced by String and accepted
 // by the Parse functions round-trips every value exactly, and is also the
 // form used by the encoding.TextMarshaler implementations, and therefore by
-// encoding/json. Scan and Value implement sql.Scanner and driver.Valuer,
+// encoding/json, which writes it as a string; UnmarshalJSON accepts a JSON
+// number as well. Scan and Value implement sql.Scanner and driver.Valuer,
 // so that the types can be read from and written to database/sql columns;
 // sql.Null[Decimal64] holds one that may be NULL.
 package decimal

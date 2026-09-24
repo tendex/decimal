@@ -1,6 +1,8 @@
 package decimal
 
 import (
+	"bytes"
+	"errors"
 	"strconv"
 	"strings"
 )
@@ -188,3 +190,38 @@ func (e *parseError) Error() string {
 // Unwrap returns the *strconv.NumError, for errors.As, and through it
 // strconv.ErrSyntax, for errors.Is.
 func (e *parseError) Unwrap() error { return &e.num }
+
+// jsonText returns the text of the JSON value b for UnmarshalText: the
+// contents of a string, or a number as it stands. It returns nil for null,
+// and an error naming typ, the destination type, for any other value.
+func jsonText(b []byte, typ string) ([]byte, error) {
+	switch {
+	case len(b) >= 2 && b[0] == '"' && b[len(b)-1] == '"':
+		if bytes.IndexByte(b, '\\') < 0 {
+			return b[1 : len(b)-1], nil
+		}
+		// A decimal needs no escapes, but JSON may write any character as
+		// one, and Go and JSON escape the ASCII characters alike.
+		s, err := strconv.Unquote(string(b))
+		if err != nil {
+			return nil, errors.New("decimal: invalid JSON string for a " + typ)
+		}
+		return []byte(s), nil
+	case string(b) == "null":
+		return nil, nil
+	case len(b) > 0 && (b[0] == '-' || '0' <= b[0] && b[0] <= '9'):
+		return b, nil
+	}
+	kind := "value"
+	if len(b) > 0 {
+		switch b[0] {
+		case '{':
+			kind = "object"
+		case '[':
+			kind = "array"
+		case 't', 'f':
+			kind = "boolean"
+		}
+	}
+	return nil, errors.New("decimal: cannot unmarshal a JSON " + kind + " into a " + typ)
+}
