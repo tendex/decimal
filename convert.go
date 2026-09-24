@@ -239,9 +239,17 @@ func (c *Context) toFloatFlags(kind kind, neg bool, coef uint128, exp int) float
 	case kind != finite || coef.isZero():
 	case math.IsInf(f, 0):
 		c.Flags |= Overflow | Inexact
-	case !floatEquals(math.Abs(f), coef, exp):
+	default:
+		a := math.Abs(f)
+		cmp := floatCmp(a, coef, exp)
+		if cmp == 0 {
+			break
+		}
 		c.Flags |= Inexact
-		if math.Abs(f) < 0x1p-1022 {
+		// Tininess is detected before rounding, as for the decimal
+		// formats: a value just below the smallest normal float64 that
+		// rounds up to it is tiny too.
+		if a < 0x1p-1022 || a == 0x1p-1022 && cmp > 0 {
 			c.Flags |= Underflow
 		}
 	}
@@ -253,10 +261,11 @@ var float64pow10 = [...]float64{
 	1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22,
 }
 
-// floatEquals reports whether the non-negative f equals coef × 10**exp.
-func floatEquals(f float64, coef uint128, exp int) bool {
-	if math.IsInf(f, 0) || f == 0 {
-		return false // coef is non-zero
+// floatCmp compares the finite, non-negative f with the non-zero
+// coef × 10**exp, returning -1, 0 or +1.
+func floatCmp(f float64, coef uint128, exp int) int {
+	if f == 0 {
+		return -1
 	}
 	fr, e2 := math.Frexp(f)
 	e2 -= 53
@@ -275,5 +284,5 @@ func floatEquals(f float64, coef uint128, exp int) bool {
 	} else {
 		lhs.Mul(lhs, p)
 	}
-	return lhs.Cmp(rhs) == 0
+	return lhs.Cmp(rhs)
 }
