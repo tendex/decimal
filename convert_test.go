@@ -216,6 +216,13 @@ func TestToFloat(t *testing.T) {
 		{"-1E+400", math.Inf(-1), Overflow | Inexact},
 		{"1E-400", 0, Underflow | Inexact},
 		{"4.9E-324", 5e-324, Underflow | Inexact},
+		// Just below the smallest normal float64 and rounding up to it:
+		// tiny before rounding, and the first also after it.
+		{"2.225073858507201136057409796709132E-308", 0x1p-1022, Underflow | Inexact},
+		{"2.225073858507201383090232717332404E-308", 0x1p-1022, Underflow | Inexact},
+		{"2.225073858507201383090232717332405E-308", 0x1p-1022, Inexact},
+		{"-2.225073858507201383090232717332404E-308", -0x1p-1022, Underflow | Inexact},
+		{"2.225073858507201E-308", 0x1p-1022 - 0x1p-1074, Underflow | Inexact},
 		{"Inf", math.Inf(1), 0},
 	} {
 		x := MustParse128(tt.in)
