@@ -171,6 +171,13 @@ func (t *text) append(b []byte, format byte, prec int) []byte {
 		return b
 	}
 	exact := prec < 0
+	if exact && t.nd == 0 {
+		// The exact forms keep the exponent of a zero, whose coefficient
+		// has the one digit 0, as String does: 0.00 is 0e-02 in %e, and
+		// 0E-398 takes the %e form in %g as 1E-398 does rather than
+		// printing 398 zeros.
+		t.buf[0], t.off, t.nd, t.dp = '0', 0, 1, t.exp+1
+	}
 	switch format {
 	case 'e', 'E':
 		if exact {
@@ -196,7 +203,7 @@ func (t *text) append(b []byte, format byte, prec int) []byte {
 			t.trim()
 		}
 		if t.nd == 0 {
-			t.dp = 0 // a zero of any exponent prints as "0"
+			t.dp = 0 // rounded to a precision, a zero prints as "0"
 		}
 		eprec := prec
 		if exact {
@@ -244,7 +251,7 @@ func (t *text) appendE(b []byte, e byte, prec int) []byte {
 
 // appendF appends ddd.ddd with prec fractional digits.
 func (t *text) appendF(b []byte, prec int) []byte {
-	if t.nd == 0 || t.dp <= 0 {
+	if t.nd == 0 || t.dp <= 0 || t.buf[t.off] == '0' { // the last: an exact zero
 		b = append(b, '0')
 	} else {
 		for i := 0; i < t.dp; i++ {
