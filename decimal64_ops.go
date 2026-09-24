@@ -75,7 +75,7 @@ func (c *Context) Round64(x Decimal64, places int) Decimal64 {
 	case n.isNaN():
 		return pack64(c.nan(&format64, n, n))
 	case n.kind == infinite || places >= -int(n.exp):
-		return x
+		return pack64(n) // canonical, as every result is
 	}
 	// Clamp places before negating it: -math.MinInt overflows, and any
 	// exponent above emax raises Invalid in quantize regardless.
