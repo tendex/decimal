@@ -14,8 +14,9 @@ import "fmt"
 // so "1.50" and "1.5" parse to different members of the same cohort.
 //
 // If s is not syntactically well-formed, Parse32 returns a quiet NaN and an
-// error of type *strconv.NumError wrapping strconv.ErrSyntax. Overflow and
-// underflow are not errors; use Context.Parse32 to observe them.
+// error that wraps a *strconv.NumError, which wraps strconv.ErrSyntax; use
+// errors.As and errors.Is to examine it. Overflow and underflow are not
+// errors; use Context.Parse32 to observe them.
 func Parse32(s string) (Decimal32, error) {
 	var c Context
 	return c.Parse32(s)
