@@ -23,7 +23,7 @@ type randFormat[T any] struct {
 func runRandom[T any](t *testing.T, rf randFormat[T], n int) {
 	r := rand.New(rand.NewPCG(uint64(rf.ref.prec), 754))
 	f := rf.ref
-	for i := 0; i < n; i++ {
+	for range n {
 		mode := RoundingMode(r.IntN(6))
 		rx, ry, rz := f.random(r), f.random(r), f.random(r)
 		if r.IntN(4) == 0 && ry.kind == finite && rx.kind == finite {

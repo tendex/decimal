@@ -1,5 +1,7 @@
 package decimal
 
+import "strconv"
+
 // Class is one of the ten IEEE 754 classes every floating-point datum falls
 // into.
 type Class uint8
@@ -37,7 +39,7 @@ func (c Class) String() string {
 	if int(c) < len(classNames) {
 		return classNames[c]
 	}
-	return "Class(" + itoa(int(c)) + ")"
+	return "Class(" + strconv.Itoa(int(c)) + ")"
 }
 
 // Ordering is the result of comparing two decimal numbers. Exactly one of
@@ -66,5 +68,5 @@ func (o Ordering) String() string {
 	case Unordered:
 		return "Unordered"
 	}
-	return "Ordering(" + itoa(int(o)) + ")"
+	return "Ordering(" + strconv.Itoa(int(o)) + ")"
 }

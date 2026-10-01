@@ -61,7 +61,7 @@ func TestFloatFastHalfway(t *testing.T) {
 	r := rand.New(rand.NewPCG(21, 26))
 	ten := big.NewInt(10)
 	var checked, gaveUp int
-	for i := 0; i < 20000; i++ {
+	for range 20000 {
 		// A random float64 and its neighbour, whose midpoint is a tie.
 		f := math.Float64frombits(r.Uint64() &^ (1 << 63))
 		if math.IsInf(f, 0) || math.IsNaN(f) || f == 0 {
@@ -120,7 +120,7 @@ func TestFloatFastHalfway(t *testing.T) {
 // decimal and back to itself, through the fast conversion where it applies.
 func TestFloatFastRoundTrip(t *testing.T) {
 	r := rand.New(rand.NewPCG(22, 26))
-	for i := 0; i < 200000; i++ {
+	for range 200000 {
 		f := math.Float64frombits(r.Uint64())
 		if math.IsInf(f, 0) || math.IsNaN(f) {
 			continue

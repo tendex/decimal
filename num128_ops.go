@@ -1,12 +1,14 @@
 package decimal
 
+import "cmp"
+
 // cmpAbs128 compares the magnitudes of two finite numbers.
 func cmpAbs128(x, y num128) int {
 	switch {
 	case x.coef.isZero() || y.coef.isZero() || x.exp == y.exp:
 		return x.coef.cmp(y.coef)
 	case x.adjusted() != y.adjusted():
-		return cmpInt(x.adjusted(), y.adjusted())
+		return cmp.Compare(x.adjusted(), y.adjusted())
 	}
 	// Same adjusted exponent: the exponents differ by less than the
 	// precision, and aligning the shorter coefficient cannot overflow.
@@ -30,7 +32,7 @@ func cmpNum128(x, y num128) int {
 	var r int
 	switch {
 	case x.kind == infinite || y.kind == infinite:
-		r = cmpInt(int(x.kind), int(y.kind)) // finite < infinite
+		r = cmp.Compare(x.kind, y.kind) // finite < infinite
 	default:
 		r = cmpAbs128(x, y)
 	}
@@ -71,14 +73,14 @@ func cmpTotal128(x, y num128) int {
 			}
 			return 0
 		}
-		if r = cmpInt(rank(x), rank(y)); r == 0 {
+		if r = cmp.Compare(rank(x), rank(y)); r == 0 {
 			r = x.coef.cmp(y.coef)
 		}
 	case x.kind == infinite || y.kind == infinite:
-		r = cmpInt(int(x.kind), int(y.kind))
+		r = cmp.Compare(x.kind, y.kind)
 	default:
 		if r = cmpAbs128(x, y); r == 0 {
-			r = cmpInt(int(x.exp), int(y.exp))
+			r = cmp.Compare(x.exp, y.exp)
 		}
 	}
 	if x.neg {

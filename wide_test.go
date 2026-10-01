@@ -60,7 +60,7 @@ func randBits(r *rand.Rand, n int) uint256 {
 func TestWideArithmetic(t *testing.T) {
 	r := rand.New(rand.NewPCG(1, 2))
 	mod256 := new(big.Int).Lsh(big.NewInt(1), 256)
-	for i := 0; i < 200000; i++ {
+	for range 200000 {
 		x, y := randBits(r, 256), randBits(r, 256)
 		bx, by := big256(x), big256(y)
 
@@ -181,7 +181,7 @@ func TestDigitCounts(t *testing.T) {
 
 func TestShiftRight(t *testing.T) {
 	r := rand.New(rand.NewPCG(3, 4))
-	for i := 0; i < 100000; i++ {
+	for range 100000 {
 		x := randBits(r, 256)
 		bx := big256(x)
 		nd := x.ndigits()

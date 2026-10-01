@@ -317,7 +317,7 @@ func TestFormatStrconv(t *testing.T) {
 
 func TestStringRoundTrip(t *testing.T) {
 	r := rand.New(rand.NewPCG(5, 6))
-	for i := 0; i < 200000; i++ {
+	for i := range 200000 {
 		x := New64FromBits(r.Uint64()).Canonical()
 		if i%3 == 0 {
 			x = rand64.fromRef(ref64.random(r))

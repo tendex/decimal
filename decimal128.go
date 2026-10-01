@@ -245,7 +245,7 @@ func (x Decimal128) DPD() (hi, lo uint64) {
 	n := x.unpack()
 	lead, rest := n.coef.quoRem(pow10tab128[33])
 	var cont uint128
-	for i := 0; i < 11; i++ {
+	for i := range 11 {
 		var r uint64
 		rest, r = rest.quoRemPow10(3)
 		d := uint128{0, uint64(bin2dpd[r])}.lsh(uint(10 * i))

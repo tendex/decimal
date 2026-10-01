@@ -77,7 +77,7 @@ func main() {
 	defer w.Flush()
 	n, _ := strconv.Atoi(os.Args[1])
 	r := rand.New(rand.NewPCG(2026, 917))
-	for i := 0; i < n; i++ {
+	for range n {
 		m := r.IntN(6)
 		mode := d.RoundingMode(m)
 		{

@@ -21,7 +21,7 @@ func main() {
 
 	b.WriteString("// pow10tab[i] is 10**i.\nvar pow10tab = [20]uint64{\n")
 	p := big.NewInt(1)
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		fmt.Fprintf(&b, "%s,\n", p)
 		p.Mul(p, ten)
 	}
@@ -29,7 +29,7 @@ func main() {
 
 	b.WriteString("// pow5tab[i] is 5**i.\nvar pow5tab = [28]uint64{\n")
 	p = big.NewInt(1)
-	for i := 0; i < 28; i++ {
+	for range 28 {
 		fmt.Fprintf(&b, "%s,\n", p)
 		p.Mul(p, big.NewInt(5))
 	}
@@ -37,7 +37,7 @@ func main() {
 
 	b.WriteString("// pow10tab128[i] is 10**i.\nvar pow10tab128 = [39]uint128{\n")
 	p = big.NewInt(1)
-	for i := 0; i < 39; i++ {
+	for i := range 39 {
 		hi := new(big.Int).Rsh(p, 64)
 		lo := new(big.Int).And(p, mask)
 		fmt.Fprintf(&b, "{%#x, %#x}, // 1e%d\n", hi, lo, i)
@@ -51,7 +51,7 @@ func main() {
 	p = big.NewInt(1)
 	two128 := new(big.Int).Lsh(big.NewInt(1), 128)
 	two64 := new(big.Int).Lsh(big.NewInt(1), 64)
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		s := 64 - p.BitLen()
 		d := new(big.Int).Lsh(p, uint(s))
 		m := new(big.Int).Sub(two128, big.NewInt(1))
@@ -65,7 +65,7 @@ func main() {
 	// little-endian, matching uint256.
 	b.WriteString("// pow10tab256[i] is 10**i.\nvar pow10tab256 = [78]uint256{\n")
 	p = big.NewInt(1)
-	for i := 0; i < 78; i++ {
+	for i := range 78 {
 		var w [4]*big.Int
 		q := new(big.Int).Set(p)
 		for j := range w {
@@ -82,7 +82,7 @@ func main() {
 
 	b.WriteString("// dpd2bin[d] is the value in [0, 999] of the 10-bit DPD declet d.\nvar dpd2bin = [1024]uint16{\n")
 	var bin2dpd [1000]uint16
-	for d := 0; d < 1024; d++ {
+	for d := range 1024 {
 		v := decodeDeclet(uint16(d))
 		fmt.Fprintf(&b, "%d,", v)
 		if d%16 == 15 {
@@ -90,7 +90,7 @@ func main() {
 		}
 	}
 	b.WriteString("}\n\n")
-	for v := 0; v < 1000; v++ {
+	for v := range 1000 {
 		bin2dpd[v] = encodeDeclet(v)
 		if decodeDeclet(bin2dpd[v]) != uint16(v) {
 			log.Fatalf("declet round trip failed for %d", v)
