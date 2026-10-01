@@ -37,6 +37,23 @@ jobs:
         env:
           GOARCH: ${{ matrix.goarch }}
 
+  cross-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+      - name: Compare results and flags with Python decimal
+        # Each operand set produces 28 operations across decimal64 and decimal128.
+        shell: bash
+        run: go run ./internal/xcheck 10000 | python3 internal/xcheck/verify.py
+
   benchmarks:
     runs-on: ubuntu-latest
     defaults:

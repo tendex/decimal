@@ -26,6 +26,15 @@ fmt.Println(subtotal.Add(tax))                                   // 64.92
 - **Pure Go, no dependencies, no assembly, no cgo.** The hot paths are built
   on the `math/bits` intrinsics, which compile to single instructions.
 
+## Installation
+
+```sh
+go get github.com/tendex/decimal@v0.1.0
+```
+
+Go 1.24 or later is required. During the v0 series, the API may change between
+releases.
+
 ## Usage
 
 The three types have identical method sets. `Decimal64` (16 digits) is the
@@ -148,8 +157,9 @@ Conformance is tested four ways:
    add, subtract, multiply, divide, fused multiply-add and square root are
    compared on hundreds of thousands of adversarially distributed random
    operands per format, in every rounding mode, flags included.
-3. **Fuzzing** of the parsers and of arithmetic on arbitrary bit patterns,
-   non-canonical encodings included, against the same reference.
+3. **Fuzzing.** The parsers are checked for panics and exact round-trips
+   through `String`. Arithmetic on arbitrary bit patterns, non-canonical
+   encodings included, is checked against the same reference.
 4. **An independent implementation.** `internal/xcheck` prints random
    operations (fourteen kinds, both large formats, all rounding modes, flags
    included) for Python's `decimal` module (libmpdec) to verify. Several
@@ -161,6 +171,10 @@ go test -short ./...                          # fewer random cases; about 3 s
 go test -run '^$' -fuzz FuzzArithmetic64 .    # fuzz
 go run ./internal/xcheck 100000 | python3 internal/xcheck/verify.py
 ```
+
+CI runs a bounded independent cross-check on every change. A weekly workflow
+fuzzes all four targets for ten minutes each; it can also be run manually, and
+retains failing inputs as downloadable artifacts.
 
 ## Performance
 
