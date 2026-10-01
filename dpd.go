@@ -12,7 +12,7 @@ package decimal
 // declets packs the low 3n decimal digits of v into n declets.
 func declets(v uint64, n int) uint64 {
 	var b uint64
-	for i := 0; i < n; i++ {
+	for i := range n {
 		b |= uint64(bin2dpd[v%1000]) << (10 * i)
 		v /= 1000
 	}

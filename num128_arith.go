@@ -189,7 +189,7 @@ func isqrt256(n uint256) uint128 {
 	if s.isZero() {
 		s.lo = 1
 	}
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		q, _ := n.quoRem128(s)
 		s = s.add(q.low128()).rsh(1)
 	}

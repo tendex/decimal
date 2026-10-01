@@ -32,7 +32,7 @@ func (t *text) setCoef(coef uint128, exp int) {
 	for coef.hi != 0 {
 		var r uint64
 		coef, r = coef.quoRemPow10(19)
-		for j := 0; j < 19; j++ {
+		for range 19 {
 			i--
 			t.buf[i] = byte('0' + r%10)
 			r /= 10
@@ -260,7 +260,7 @@ func (t *text) appendF(b []byte, prec int) []byte {
 	}
 	if prec > 0 {
 		b = append(b, '.')
-		for i := 0; i < prec; i++ {
+		for i := range prec {
 			b = append(b, t.digit(t.dp+i))
 		}
 	}

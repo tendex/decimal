@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -141,7 +141,7 @@ func runDecTests(t *testing.T, pattern string, ops map[string]decOp, hex func(st
 	for op, n := range stats.skipped {
 		skipped = append(skipped, fmt.Sprintf("%s:%d", op, n))
 	}
-	sort.Strings(skipped)
+	slices.Sort(skipped)
 	t.Logf("%d cases run; skipped %v", stats.run, skipped)
 }
 

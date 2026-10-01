@@ -1,6 +1,9 @@
 package decimal
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // RoundingMode is a rounding direction: one of the five IEEE 754
 // rounding-direction attributes, or AwayFromZero. The names follow math/big.
@@ -34,7 +37,7 @@ func (m RoundingMode) String() string {
 	case AwayFromZero:
 		return "AwayFromZero"
 	}
-	return "RoundingMode(" + itoa(int(m)) + ")"
+	return "RoundingMode(" + strconv.Itoa(int(m)) + ")"
 }
 
 // Flags is a set of IEEE 754 exception status flags.
@@ -74,7 +77,7 @@ func (f Flags) String() string {
 		}
 	}
 	if rest := f >> len(flagNames) << len(flagNames); rest != 0 {
-		names = append(names, "Flags("+itoa(int(rest))+")")
+		names = append(names, "Flags("+strconv.Itoa(int(rest))+")")
 	}
 	return strings.Join(names, "|")
 }
@@ -106,27 +109,3 @@ type Context struct {
 
 // Raised reports whether any of the given flags is set in c.
 func (c *Context) Raised(f Flags) bool { return c.Flags&f != 0 }
-
-// itoa formats a small integer.
-func itoa(v int) string {
-	if v == 0 {
-		return "0"
-	}
-	var buf [20]byte
-	i := len(buf)
-	neg := v < 0
-	u := uint64(v)
-	if neg {
-		u = -u
-	}
-	for u > 0 {
-		i--
-		buf[i] = byte('0' + u%10)
-		u /= 10
-	}
-	if neg {
-		i--
-		buf[i] = '-'
-	}
-	return string(buf[i:])
-}

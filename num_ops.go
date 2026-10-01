@@ -1,41 +1,24 @@
 package decimal
 
-import "math/bits"
+import (
+	"cmp"
+	"math/bits"
+)
 
 // cmpAbs compares the magnitudes of two finite numbers.
 func cmpAbs(x, y num) int {
 	switch {
 	case x.coef == 0 || y.coef == 0 || x.exp == y.exp:
-		return cmpUint64(x.coef, y.coef)
+		return cmp.Compare(x.coef, y.coef)
 	case x.adjusted() != y.adjusted():
-		return cmpInt(x.adjusted(), y.adjusted())
+		return cmp.Compare(x.adjusted(), y.adjusted())
 	}
 	// Same adjusted exponent: the exponents differ by less than the
 	// precision, and aligning the shorter coefficient cannot overflow.
 	if x.exp >= y.exp {
-		return cmpUint64(x.coef*pow10tab[x.exp-y.exp], y.coef)
+		return cmp.Compare(x.coef*pow10tab[x.exp-y.exp], y.coef)
 	}
-	return cmpUint64(x.coef, y.coef*pow10tab[y.exp-x.exp])
-}
-
-func cmpUint64(x, y uint64) int {
-	switch {
-	case x < y:
-		return -1
-	case x > y:
-		return 1
-	}
-	return 0
-}
-
-func cmpInt(x, y int) int {
-	switch {
-	case x < y:
-		return -1
-	case x > y:
-		return 1
-	}
-	return 0
+	return cmp.Compare(x.coef, y.coef*pow10tab[y.exp-x.exp])
 }
 
 // cmpNum compares two non-NaN numbers by value.
@@ -52,7 +35,7 @@ func cmpNum(x, y num) int {
 	var r int
 	switch {
 	case x.kind == infinite || y.kind == infinite:
-		r = cmpInt(int(x.kind), int(y.kind)) // finite < infinite
+		r = cmp.Compare(x.kind, y.kind) // finite < infinite
 	default:
 		r = cmpAbs(x, y)
 	}
@@ -100,14 +83,14 @@ func cmpTotal(x, y num) int {
 			}
 			return 0
 		}
-		if r = cmpInt(rank(x), rank(y)); r == 0 {
-			r = cmpUint64(x.coef, y.coef)
+		if r = cmp.Compare(rank(x), rank(y)); r == 0 {
+			r = cmp.Compare(x.coef, y.coef)
 		}
 	case x.kind == infinite || y.kind == infinite:
-		r = cmpInt(int(x.kind), int(y.kind))
+		r = cmp.Compare(x.kind, y.kind)
 	default:
 		if r = cmpAbs(x, y); r == 0 {
-			r = cmpInt(int(x.exp), int(y.exp))
+			r = cmp.Compare(x.exp, y.exp)
 		}
 	}
 	if x.neg {
@@ -377,7 +360,7 @@ func classifyRem(r, d uint64) remainder {
 	if r == 0 {
 		return remZero
 	}
-	return remBelow + remainder(1+cmpUint64(2*r, d))
+	return remBelow + remainder(1+cmp.Compare(2*r, d))
 }
 
 // roundToMultiple returns x rounded to a multiple of y, which must be finite

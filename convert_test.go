@@ -107,7 +107,7 @@ func TestInt64(t *testing.T) {
 		}
 	}
 	r := rand.New(rand.NewPCG(7, 8))
-	for i := 0; i < 100000; i++ {
+	for range 100000 {
 		v := int64(r.Uint64()) >> r.IntN(64)
 		if got, exact := New128(v, 0).Int64(); got != v || !exact {
 			t.Fatalf("New128(%d).Int64() = %d, %v", v, got, exact)
@@ -167,7 +167,7 @@ func TestFromFloat(t *testing.T) {
 	}
 
 	r := rand.New(rand.NewPCG(9, 10))
-	for i := 0; i < 100000; i++ {
+	for i := range 100000 {
 		f := math.Float64frombits(r.Uint64())
 		if math.IsNaN(f) || math.IsInf(f, 0) {
 			continue
@@ -266,7 +266,7 @@ func TestToFloat(t *testing.T) {
 		}
 	}
 	r := rand.New(rand.NewPCG(11, 12))
-	for i := 0; i < 100000; i++ {
+	for range 100000 {
 		x := rand64.fromRef(ref64.random(r))
 		if !x.IsFinite() {
 			continue
@@ -317,7 +317,7 @@ func TestConvertFormat(t *testing.T) {
 	}
 	// Widening is exact and preserves the representation.
 	r := rand.New(rand.NewPCG(13, 14))
-	for i := 0; i < 100000; i++ {
+	for range 100000 {
 		x := New32FromBits(r.Uint32()).Canonical()
 		if x.IsSignaling() {
 			continue
