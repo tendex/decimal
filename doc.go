@@ -14,10 +14,13 @@
 // # Values
 //
 // The three types are plain values of 4, 8 and 16 bytes holding 7, 16 and 34
-// significant digits. Arithmetic never allocates, the zero value is the number
-// zero, and every method is safe for concurrent use. All three have the
-// same methods; Decimal64 is the natural choice for most purposes, and the
-// one whose documentation is the most complete.
+// significant digits. Arithmetic never allocates, and the zero value is the
+// number zero. All three have the same methods; Decimal64 is the natural
+// choice for most purposes, and the one whose documentation is the most complete.
+//
+// Values may be read concurrently. Methods that mutate a value, such as Scan
+// and UnmarshalText, require synchronization with other uses of that value.
+// A Context must not be shared between goroutines without synchronization.
 //
 // A finite number is a sign, an integer coefficient and an exponent,
 // coefficient × 10**exponent. Unlike binary floating point the
